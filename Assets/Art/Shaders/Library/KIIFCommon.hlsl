@@ -1,0 +1,113 @@
+#ifndef KIIF_Common_INCLUDED
+#define KIIF_Common_INCLUDED
+
+#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+
+// 硬边带描边的溶解
+inline half4 Dissipate(half dissipateSrc, half disspateIntensity, half disspateEdge, half3 disspateEdgeColor)
+{
+    half4 outColor;
+    half dissipateFactor = step(disspateIntensity, dissipateSrc);
+    half dissipateEdgeFactor = step(disspateIntensity - disspateEdge, dissipateSrc);
+    outColor.a = dissipateEdgeFactor;
+
+    #if defined(_ALPHATEST_ON)
+    clip(dissipateEdgeFactor - 0.5h);
+    #endif
+
+    dissipateEdgeFactor -= dissipateFactor;
+    outColor.rgb = dissipateEdgeFactor * disspateEdgeColor;
+    return outColor;
+}
+
+// 不需要描边的硬边溶解
+inline void Dissipate(half dissipateSrc, half disspateIntensity)
+{
+    Dissipate(dissipateSrc, disspateIntensity, 0, half3(0,0,0));
+}
+
+// 能完全溶解，溶解的开始和结束的边界做处理
+inline half4 DissipateCompletely(half dissipateSrc, half disspateIntensity, half disspateEdge, half3 disspateEdgeColor)
+{
+    dissipateSrc = dissipateSrc * 0.98h + 0.01h;
+    half fadeEdgeRange =  abs(disspateIntensity * 2 - 1);
+    fadeEdgeRange = step(fadeEdgeRange, 0.98);      //当溶解强度小于0.01或大于0.99
+    disspateEdge *= fadeEdgeRange;
+    return Dissipate(dissipateSrc, disspateIntensity, disspateEdge, disspateEdgeColor);
+}
+
+// 不需要描边的硬边溶解
+inline void DissipateCompletely(half dissipateSrc, half disspateIntensity)
+{
+    DissipateCompletely(dissipateSrc, disspateIntensity, 0, half3(0,0,0));
+}
+
+// 溶解混合(取消像素剔除)
+inline half4 DissipateBlend(half dissipateSrc, half disspateIntensity, half disspateEdge, half3 disspateEdgeColor)
+{
+    half4 outColor;
+    half dissipateFactor = step(disspateIntensity, dissipateSrc);
+    half dissipateEdgeFactor = step(disspateIntensity - disspateEdge, dissipateSrc);
+    outColor.a = dissipateEdgeFactor;
+
+    dissipateEdgeFactor -= dissipateFactor;
+    outColor.rgb = dissipateEdgeFactor * disspateEdgeColor;
+    return outColor;
+}
+
+/**
+ * \brief 用黑白贴图生成折射的效果，制作空气扰动等效果，返回扰动的UV
+ * \param height 折射的强度，黑白贴图
+ */
+half2 RefractionOffset(half3 viewDirectionWS, half3 normalWS, half4 screenPosition, half height)
+{
+    half3 V = viewDirectionWS;
+    half3 N = normalWS;
+    half3 R = cross(N, V);
+    half3 D = cross(R, V);
+    half3 VR = cross(half3(0,1,0), V);
+    half3 VU = normalize(cross(V, VR));
+    VR = cross(VU, V);
+    half2 offset = half2(dot(D, VR), -dot(D, VU)) * (screenPosition.xy);
+    offset *= rcp(screenPosition.w) * height;
+    return screenPosition.xy + offset;
+}
+
+// 折射 i:入射光线方向 n:表面法线 eta:折射相对系数(入射物质ior/折射物质ior)
+// I和N之间的角度太大则返回(0, 0, 0)
+// https://developer.download.nvidia.cn/cg/refract.html
+float3 refract(float3 i, float3 n, float eta)
+{
+    float cosi = dot(-i, n);
+    float cost2 = 1 - eta * eta * (1 - cosi * cosi);
+    float3 t = eta * i + n * (eta * cosi - sqrt(abs(cost2)));
+    return t * step(0, cost2);  // t * (float3)(cost2 > 0)
+}
+
+/**
+ * \brief 数学推算的折射方法，更正确些也更耗
+ * \param eta 折射相对系数(入射物质ior/折射物质ior)
+ */
+half2 RefractionEta(half3 viewDirWS, half3 normalWS, half eta)
+{
+    half3 refraction = refract(-viewDirWS, normalWS, eta);
+    //  折射后的像素位置
+    half3 refractionPositionWS = _WorldSpaceCameraPos.xyz + refraction;
+    half4 refractionPositionCS = TransformWorldToHClip(refractionPositionWS);
+    half4 refractionUV = ComputeScreenPos(refractionPositionCS) / refractionPositionCS.w;
+    return refractionUV.xy;
+}
+
+/**
+ * \brief 
+ * \param In 输入值
+ * \param Contrast 对比度,0为原本效果
+ * \return 输出值
+ */
+half CheapContrast(half In, half Contrast)
+{
+    half temp = lerp(0 - Contrast, 1 + Contrast, In);
+    return clamp(temp, 0.0f, 1.0f);
+}
+
+#endif
