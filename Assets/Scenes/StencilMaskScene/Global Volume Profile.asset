@@ -86,7 +86,7 @@ MonoBehaviour:
   m_Name: RoomStencilVolume
   m_EditorClassIdentifier: 
   active: 1
-  StencilRefValue:
+  stencilRefValue:
     m_OverrideState: 1
     m_Value: 2
   blurSpread:
@@ -95,6 +95,6 @@ MonoBehaviour:
   preDownSample:
     m_OverrideState: 1
     m_Value: 1
-  BlurIterations:
-    m_OverrideState: 1
-    m_Value: 3
+  blurIterations:
+    m_OverrideState: 0
+    m_Value: 4

@@ -195,33 +195,5 @@
             }
             ENDHLSL
         }
-        //绘制区域 4
-        Pass                
-        {
-
-            HLSLPROGRAM
-            #pragma vertex vert
-            #pragma fragment frag
-
-
-            v2f vert (appdata v)
-            {
-                v2f o;
-                VertexPositionInputs  PositionInputs = GetVertexPositionInputs(v.positionOS.xyz);
-                o.positionCS = PositionInputs.positionCS;
-                o.uv = v.texcoord;
-
-                return o;
-            }
-
-
-            half4 frag (v2f i) : SV_Target
-            {
-                //return half4(1,1,1,1);
-                return half4(0,0,0,0);
-            }
-            ENDHLSL
-        }
-
     }
 }

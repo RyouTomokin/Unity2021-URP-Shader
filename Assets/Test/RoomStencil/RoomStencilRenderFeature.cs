@@ -14,16 +14,24 @@ public class RoomStencilRenderFeature : ScriptableRendererFeature
         //设置渲染顺序
         public RenderPassEvent renderPassEvent = RenderPassEvent.BeforeRenderingPostProcessing;
         public Shader shader;
+        public bool cameraStackMode;
     }
     
     public override void Create()
     {
         this.name = "RoomStencil";
-        _roomStencilPass = new RoomStencilPass(settings.renderPassEvent, settings.shader);
+        _roomStencilPass = new RoomStencilPass(settings.renderPassEvent, settings.shader, settings.cameraStackMode);
     }
 
     public override void AddRenderPasses(ScriptableRenderer renderer, ref RenderingData renderingData)
     {
+        //此效果只对Scene场景和带MainCamera标签的相机起作用
+        if (renderingData.cameraData.cameraType != CameraType.SceneView &&
+            !renderingData.cameraData.camera.CompareTag("MainCamera"))
+        {
+            return;
+        }
+
         _roomStencilPass.Setup(renderer.cameraColorTarget);
         renderer.EnqueuePass(_roomStencilPass);
     }
@@ -32,9 +40,7 @@ public class RoomStencilRenderFeature : ScriptableRendererFeature
 public class RoomStencilPass : ScriptableRenderPass
 {
     private static readonly string RenderTag = "RoomStencil";
-    private static readonly int MainTexId = Shader.PropertyToID("_MainTex");
-    // 设置存储图像信息
-    static readonly int TempTargetId = Shader.PropertyToID("_StencilMask");
+
     private int[] downSampleRT;
     private int[] upSampleRT;
 
@@ -42,9 +48,11 @@ public class RoomStencilPass : ScriptableRenderPass
     private Material _postProcessMat;                   //后处理使用材质
 
     private RenderTargetIdentifier _currentTarget;      //设置当前渲染目标
+    private bool _cameraStackMode;
 
     #region 设置渲染事件
-    public RoomStencilPass(RenderPassEvent evt, Shader postProcessShader)
+
+    public RoomStencilPass(RenderPassEvent evt, Shader postProcessShader, bool mode)
     {
         renderPassEvent = evt;
         var shader = postProcessShader;
@@ -54,10 +62,12 @@ public class RoomStencilPass : ScriptableRenderPass
             Debug.LogError("没有指定Shader");
             return;
         }
+
         //如果存在则新建材质
         _postProcessMat = CoreUtils.CreateEngineMaterial(postProcessShader);
+
+        _cameraStackMode = mode;
     }
-    
 
     #endregion
 
@@ -75,17 +85,25 @@ public class RoomStencilPass : ScriptableRenderPass
     //必须重载一个名为Execute的方法，该方法便是逻辑执行的地方
     public override void Execute(ScriptableRenderContext context, ref RenderingData renderingData)
     {
+        //此效果只对Scene场景和带MainCamera标签的相机起作用
+        if (renderingData.cameraData.cameraType != CameraType.SceneView &&
+            !renderingData.cameraData.camera.CompareTag("MainCamera"))
+        {
+            return;
+        }
+
         if (_postProcessMat == null)
         {
             Debug.LogError("材质初始化失败");
             return;
         }
+
         //摄像机是否开启后处理
         if (!renderingData.cameraData.postProcessEnabled)
         {
             return;
         }
-        
+
         //传入volume
         var stack = VolumeManager.instance.stack;
         //获取我们的volume
@@ -93,6 +111,11 @@ public class RoomStencilPass : ScriptableRenderPass
         if (_roomStencilVolume == null)
         {
             Debug.LogError("Volume组件获取失败");
+            return;
+        }
+
+        if (!_roomStencilVolume.IsActive())
+        {
             return;
         }
 
@@ -104,36 +127,43 @@ public class RoomStencilPass : ScriptableRenderPass
     }
 
     #endregion
-    
+
     #region 渲染
+
     void Render(CommandBuffer cmd, ref RenderingData renderingData)
     {
         ref var cameraData = ref renderingData.cameraData;
         var camera = cameraData.camera;
-        var source = _currentTarget;
-        int destination = TempTargetId;
-        int tmpSceneColor = Shader.PropertyToID("tmpSceneColor");
-        _postProcessMat.SetInt("_RefValue", _roomStencilVolume.StencilRefValue.value);
+        _postProcessMat.SetInt("_RefValue", _roomStencilVolume.stencilRefValue.value);
         _postProcessMat.SetFloat("_BlurRange", _roomStencilVolume.blurSpread.value);
 
-        
-        cmd.GetTemporaryRT(destination, camera.scaledPixelWidth, camera.scaledPixelHeight);
-        cmd.GetTemporaryRT(tmpSceneColor, camera.scaledPixelWidth, camera.scaledPixelHeight);
+        var source = _currentTarget;
+        int tmpSceneColor = Shader.PropertyToID("tmpSceneColor_roomStencil");
+        RenderTextureDescriptor desc = renderingData.cameraData.cameraTargetDescriptor;
+        cmd.GetTemporaryRT(tmpSceneColor, desc);
         cmd.Blit(source, tmpSceneColor);
-        
-        //在Stencil区域绘制
-        
-        //cmd.ClearRenderTarget(true,true,Color.black);
-        cmd.Blit(destination,source, _postProcessMat, 4);
-        //cmd.SetRenderTarget(destination);
-        cmd.Blit(destination,source, _postProcessMat, 0);
-        
-        
+        cmd.SetRenderTarget(cameraData.renderer.cameraColorTarget, RenderBufferLoadAction.DontCare, RenderBufferStoreAction.Store,
+            cameraData.renderer.cameraDepthTarget, RenderBufferLoadAction.DontCare, RenderBufferStoreAction.Store);
+        cmd.ClearRenderTarget(false, true, Color.clear);
+
+        //获取Stencil遮罩，Scene视口和Game视口不一致
+        if (cameraData.cameraType == CameraType.Game && _cameraStackMode)
+        {
+            //Blit不支持堆栈相机，深度缓冲区无法进入，使用DrawMesh的方式渲染
+            cmd.SetViewProjectionMatrices(Matrix4x4.identity, Matrix4x4.identity);
+            cmd.DrawMesh(RenderingUtils.fullscreenMesh, Matrix4x4.identity, _postProcessMat, 0, 0);
+            cmd.SetViewProjectionMatrices(camera.worldToCameraMatrix, camera.projectionMatrix);
+        }
+        else
+        {
+            cmd.Blit(null, source, _postProcessMat, 0);
+        }
+
         //降采样升采样去模糊处理
         RenderTargetIdentifier tmpRT = source;
         int width = camera.scaledPixelWidth;
         int height = camera.scaledPixelHeight;
-        int iteration = _roomStencilVolume.BlurIterations.value;
+        int iteration = _roomStencilVolume.blurIterations.value;
         int preDownSample = _roomStencilVolume.preDownSample.value;
         downSampleRT = new int[iteration];
         upSampleRT = new int[iteration];
@@ -145,13 +175,13 @@ public class RoomStencilPass : ScriptableRenderPass
             upSampleRT[i] = Shader.PropertyToID("UpSample" + i);
         }
 
-        width /= preDownSample;
-        height /= preDownSample;
+        width  = width >> preDownSample;
+        height = height >> preDownSample;
         //降采样
         for (int i = 0; i < iteration; i++)
         {
-            width = Mathf.Max(width / 2, 1);
-            height = Mathf.Max(height / 2, 1);
+            width = Mathf.Max(width>>1, 1);
+            height = Mathf.Max(height>>1, 1);
             cmd.GetTemporaryRT(downSampleRT[i], width, height, 0, FilterMode.Bilinear, RenderTextureFormat.Default);
             cmd.GetTemporaryRT(upSampleRT[i], width, height, 0, FilterMode.Bilinear, RenderTextureFormat.Default);
 
@@ -174,8 +204,9 @@ public class RoomStencilPass : ScriptableRenderPass
             cmd.ReleaseTemporaryRT(downSampleRT[i]);
             cmd.ReleaseTemporaryRT(upSampleRT[i]);
         }
+
         cmd.ReleaseTemporaryRT(tmpSceneColor);
-        cmd.ReleaseTemporaryRT(destination);
     }
+
     #endregion
 }
