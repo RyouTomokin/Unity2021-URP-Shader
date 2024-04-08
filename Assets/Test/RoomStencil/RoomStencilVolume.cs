@@ -10,8 +10,8 @@ public class RoomStencilVolume : VolumeComponent
 {
     public IntParameter stencilRefValue = new IntParameter(0);
     public FloatParameter blurSpread = new FloatParameter(0);
-    public IntParameter preDownSample = new IntParameter(1);
-    public IntParameter blurIterations = new IntParameter(4);
+    public ClampedIntParameter preDownSample = new ClampedIntParameter(0, 0, 8);
+    public ClampedIntParameter blurIterations = new ClampedIntParameter(4, 1, 16);
     public bool IsActive() => stencilRefValue.value > 0;
 
     public bool IsTileCompatible() => false;
