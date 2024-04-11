@@ -4,9 +4,10 @@ Shader "KIIF/Effect/Distort"
     {
         [MainColor][HDR] _BaseColor("Color", Color) = (1,1,1,1)
         [MainTexture] _BaseMap("Albedo", 2D) = "white" {}
+        _MainSpeed("主贴图流动速度", Vector) = (0,0,0,0)
         _Cutoff("Alpha Cutoff", Range(0.0, 1.0)) = 0
         [Toggle] _SoftParticlesEnabled("__softparticlesenabled", Float) = 0.0
-        _SoftParticle("软粒子", Range(0 , 10)) = 1
+        _SoftParticle("软粒子", Range(0, 10)) = 1
         _MoveToCamera("移向摄像机", Range(-20 , 20)) = 0
         
         _TwistSpeed("扭曲流动速度", Float) = 0
@@ -17,7 +18,7 @@ Shader "KIIF/Effect/Distort"
         _DissolveSpeed("溶解流动速度", Float) = 0
         _Dissolve("溶解进度", Range(0.0, 1.0)) = 0
         _DissolveMap("溶解贴图", 2D) = "white" {}
-        _DissolveSharpen("溶解硬度", Float) = 0
+        _DissolveSharpen("溶解硬度(最小值为1)", Range(1, 20)) = 0
         [HDR] _DissolveSideColor("溶解边缘颜色", Color) = (0,0,0,0)
         _DissolveSideWidth("溶解边缘宽度", Float) = 0
         
@@ -106,14 +107,16 @@ Shader "KIIF/Effect/Distort"
 
             CBUFFER_START(UnityPerMaterial)
             float4 _BaseMap_ST;
+            float2 _MainSpeed;
             half4 _BaseColor;
             half _Cutoff;
 
             float4 _TwistMap_ST;
             half _TwistSpeed;
-            half _TwistStrenght;
+            half _TwistStrength;
 
             float4 _DissolveMaskMap_ST;
+            float4 _DissolveMap_ST;
             half _Dissolve;
             half _DissolveSpeed;
             half _DissolveSideWidth;
@@ -172,11 +175,12 @@ Shader "KIIF/Effect/Distort"
                 // 扭曲
                 half2 twistUV = uv * _TwistMap_ST.xy + _TwistSpeed * _TwistMap_ST.zw * _Time.y;
                 half2 twist = SAMPLE_TEXTURE2D(_TwistMap, sampler_TwistMap, twistUV).rg;
-                twist = (twist - 0.5) * 2;
-                twist *= _TwistStrenght;
+                // twist = (twist - 0.5) * 2;
+                twist *= _TwistStrength;
 
                 // 基础功能
                 float2 baseuv = TRANSFORM_TEX(input.texcoord, _BaseMap) + twist;
+                baseuv += _Time.y * _MainSpeed.xy;
                 half4 color = SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, baseuv);
                 color *= _BaseColor * vertexColor;
                 clip(color.a - _Cutoff);
@@ -187,10 +191,12 @@ Shader "KIIF/Effect/Distort"
 
                 // dissolveMask = saturate((dissolveMask - 0.5) * dissolveMaskSoft + dissolveMaskRange);
 
-                half2 dissolveUV = uv + twist + _Time.y * _DissolveSpeed;
-                half dissolveFactor = input.texcoord.z + _Dissolve;
+                half2 dissolveUV = uv * _DissolveMap_ST.xy + _DissolveSpeed * _DissolveMap_ST.zw * _Time.y + twist;
+                // half dissolveFactor = input.texcoord.z + _Dissolve;
+                half dissolveFactor = _Dissolve;
                 half dissolve = SAMPLE_TEXTURE2D(_DissolveMap, sampler_DissolveMap, dissolveUV).r;
-                dissolve = saturate(dissolve + dissolveMask - 1);       //溶解遮罩dissolve-(1-mask)
+                // dissolve = (dissolve + dissolveMask - 1);       //溶解遮罩dissolve-(1-mask)
+                dissolve = (dissolve + dissolveMask - _Dissolve);       //溶解遮罩dissolve-(1-mask)
                 dissolve = dissolve + 1 - (2 * dissolveFactor);         //溶解程度dissolve-2(factor-0.5)
                 half dissolveSide = step(0, dissolve) - step(_DissolveSideWidth, dissolve);
                 dissolve = (dissolve - 0.5) * _DissolveSharpen + 0.5;   //溶解边缘锐化
@@ -322,7 +328,7 @@ Shader "KIIF/Effect/Distort"
             ENDHLSL
         }
     }
-    CustomEditor "Effect_ShaderGUI"
+    CustomEditor "Effect_Distort_ShaderGUI"
     Fallback "Hidden/InternalErrorShader"
 }
 
