@@ -1,6 +1,6 @@
-#我使用的一些小渲染功能
+# 我使用的一些小渲染功能
 
-##Base Shader
+## Base Shader
 >PBR_Base
 基础的光照，额外添加法线向上的纹理层和世界空间的颜色渐变
 >PBR_MatFog
@@ -29,14 +29,18 @@
 有些功能或开关或一些便利的操作使用GUI去完成
 因为GUI的原因，通过脚本替换材质可能导致某些效果并未生效，打开材质的编辑界面即可自动刷新
 
-##Renderer Feature
+## Renderer Feature
 >RoomStencil
 主要文件为RenderFeature文件、Volume文件和Shader文件
 需要StencilMask的Shader去协助写入Stencil
 
 **RenderFeature文件核心功能：**
-暂存颜色、清空画布、绘制Stencil遮罩、遮罩模糊、遮罩覆盖颜色
-使得Stencil区域才能正常渲染，其他区域为黑色贝遮罩的效果
+1. 暂存颜色
+2. 清空画布
+3. 绘制Stencil遮罩
+4. 遮罩模糊
+5. 遮罩覆盖颜色
+使得Stencil区域才能正常渲染，其他区域为黑色被遮罩的效果
 ![StencilMask_Room](https://github.com/RyouTomokin/Unity2021-URP-Shader/assets/55241756/6ec873eb-f5dc-4e46-a47b-f5adc4e70148)
 
 **主要解决的问题：相机堆栈导致的Stencil数据无法正确使用，最终导致效果错误**
