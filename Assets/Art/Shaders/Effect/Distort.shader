@@ -14,6 +14,10 @@ Shader "KIIF/Effect/Distort"
         _TwistMap("扭曲贴图(offset为流动方向)", 2D) = "white" {}
         _TwistStrength("扭曲强度", Float) = 0
         
+        _MaskMap("遮罩图", 2D) = "white" {}
+        _MaskTwistStrength("遮罩图被扭曲的强度", Range(0 , 1)) = 0
+        _MaskSoft("遮罩图软硬", Range( 1 , 10)) = 1
+        
         _DissolveMaskMap("溶解的遮罩贴图", 2D) = "white" {}
         _DissolveSpeed("溶解流动速度", Float) = 0
         _Dissolve("溶解进度", Range(0.0, 1.0)) = 0
@@ -62,13 +66,13 @@ Shader "KIIF/Effect/Distort"
             // -------------------------------------
             // Particle Keywords
             #pragma shader_feature_local _SOFTPARTICLES_ON
-            #pragma shader_feature_local_fragment _ _ALPHAPREMULTIPLY_ON _ALPHAMODULATE_ON
+            // #pragma shader_feature_local_fragment _ _ALPHAPREMULTIPLY_ON _ALPHAMODULATE_ON
             #pragma shader_feature_local_fragment _ _COLOROVERLAY_ON _COLORCOLOR_ON _COLORADDSUBDIFF_ON
 
             // -------------------------------------
             // Unity defined keywords
             #pragma multi_compile_fog
-            #pragma multi_compile_instancing
+            // #pragma multi_compile_instancing
             #pragma multi_compile_fragment _ _SCREEN_SPACE_OCCLUSION
             #pragma multi_compile_fragment _ DEBUG_DISPLAY
             #pragma instancing_options procedural:ParticleInstancingSetup       //粒子Shader必备
@@ -115,6 +119,10 @@ Shader "KIIF/Effect/Distort"
             half _TwistSpeed;
             half _TwistStrength;
 
+            float4 _MaskMap_ST;
+            half _MaskTwistStrength;
+            half _MaskSoft;
+
             float4 _DissolveMaskMap_ST;
             float4 _DissolveMap_ST;
             half _Dissolve;
@@ -129,6 +137,7 @@ Shader "KIIF/Effect/Distort"
 
             TEXTURE2D(_BaseMap);            SAMPLER(sampler_BaseMap);
             TEXTURE2D(_TwistMap);           SAMPLER(sampler_TwistMap);
+            TEXTURE2D(_MaskMap);            SAMPLER(sampler_MaskMap);
             TEXTURE2D(_DissolveMaskMap);    SAMPLER(sampler_DissolveMaskMap);
             TEXTURE2D(_DissolveMap);        SAMPLER(sampler_DissolveMap);
 
@@ -179,9 +188,9 @@ Shader "KIIF/Effect/Distort"
                 twist *= _TwistStrength;
 
                 // 基础功能
-                float2 baseuv = TRANSFORM_TEX(input.texcoord, _BaseMap) + twist;
-                baseuv += _Time.y * _MainSpeed.xy;
-                half4 color = SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, baseuv);
+                float2 baseUV = TRANSFORM_TEX(uv, _BaseMap) + twist;
+                baseUV += _Time.y * _MainSpeed.xy;
+                half4 color = SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, baseUV);
                 color *= _BaseColor * vertexColor;
                 clip(color.a - _Cutoff);
 
@@ -192,20 +201,25 @@ Shader "KIIF/Effect/Distort"
                 // dissolveMask = saturate((dissolveMask - 0.5) * dissolveMaskSoft + dissolveMaskRange);
 
                 half2 dissolveUV = uv * _DissolveMap_ST.xy + _DissolveSpeed * _DissolveMap_ST.zw * _Time.y + twist;
-                // half dissolveFactor = input.texcoord.z + _Dissolve;
-                half dissolveFactor = _Dissolve;
+                half dissolveFactor = input.texcoord.z + _Dissolve;
+                // half dissolveFactor = _Dissolve;
                 half dissolve = SAMPLE_TEXTURE2D(_DissolveMap, sampler_DissolveMap, dissolveUV).r;
-                // dissolve = (dissolve + dissolveMask - 1);       //溶解遮罩dissolve-(1-mask)
-                dissolve = (dissolve + dissolveMask - _Dissolve);       //溶解遮罩dissolve-(1-mask)
-                dissolve = dissolve + 1 - (2 * dissolveFactor);         //溶解程度dissolve-2(factor-0.5)
+                // dissolve = (dissolve + dissolveMask - 1);                    //溶解遮罩dissolve-(1-mask)
+                dissolve = saturate(dissolve + dissolveMask - dissolveFactor);  //溶解遮罩dissolve-(1-mask)
+                dissolve = dissolve + 1 - (2 * dissolveFactor);                 //溶解程度dissolve-2(factor-0.5)
                 half dissolveSide = step(0, dissolve) - step(_DissolveSideWidth, dissolve);
-                dissolve = (dissolve - 0.5) * _DissolveSharpen + 0.5;   //溶解边缘锐化
+                dissolve = (dissolve - 0.5) * _DissolveSharpen + 0.5;           //溶解边缘锐化
                 dissolve = saturate(dissolve);
 
                 half3 dissolveSideColor = dissolveSide * _DissolveSideColor.rgb;
                 color *= dissolve;
                 color.rgb += dissolveSideColor;
-                
+
+                // 遮罩
+                float2 maskuv = TRANSFORM_TEX(uv, _MaskMap) + twist * _MaskTwistStrength;
+                half mask = SAMPLE_TEXTURE2D(_MaskMap, sampler_MaskMap, maskuv).r;
+                mask = saturate((mask - 0.5) * _MaskSoft + 0.5);
+                color.a *= mask;
                 
                 // 软粒子
                 #ifdef _SOFTPARTICLES_ON

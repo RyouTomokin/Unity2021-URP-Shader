@@ -56,6 +56,29 @@ inline half4 DissipateBlend(half dissipateSrc, half disspateIntensity, half diss
 }
 
 /**
+ * \brief 软溶解
+ * \param factor 溶解进度
+ * \param dissolveSrc 采样的溶解图颜色
+ * \param dissolveMask 溶解遮罩，黑色先溶解
+ * \param sideWidth 溶解亮边宽度
+ * \param sharpen 溶解的硬度
+ * \return (溶解的范围，溶解亮边的范围)
+ */
+inline half2 Dissolve(half factor, half dissolveSrc, half dissolveMask = 0,
+                      half sideWidth = 0, half sharpen = 1)
+{
+    half dissolve = dissolveSrc;
+    // dissolve = (dissolve + dissolveMask - 1);        //溶解遮罩dissolve-(1-mask)
+    dissolve = saturate(dissolve + dissolveMask - factor);      //溶解遮罩dissolve-(1-mask)
+    dissolve = dissolve + 1 - (2 * factor);             //溶解程度dissolve-2(factor-0.5)
+    half dissolveSide = step(0, dissolve) - step(sideWidth, dissolve);
+    dissolve = (dissolve - 0.5) * sharpen + 0.5;        //溶解边缘锐化
+    dissolve = saturate(dissolve);
+
+    return half2(dissolve, dissolveSide);
+}
+
+/**
  * \brief 用黑白贴图生成折射的效果，制作空气扰动等效果，返回扰动的UV
  * \param height 折射的强度，黑白贴图
  */

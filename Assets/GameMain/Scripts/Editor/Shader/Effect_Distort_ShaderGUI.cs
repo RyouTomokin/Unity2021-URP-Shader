@@ -10,6 +10,7 @@ public class Effect_Distort_ShaderGUI : ShaderGUI
     private static bool _Base_Foldout = false;
     private static bool _Color_Foldout = true;
     private static bool _Twist_Foldout = false;
+    private static bool _Mask_Foldout = false;
     private static bool _Dissolve_Foldout = false;
     
     MaterialEditor m_MaterialEditor;
@@ -27,17 +28,21 @@ public class Effect_Distort_ShaderGUI : ShaderGUI
     MaterialProperty SoftParticle = null;
     MaterialProperty MoveToCamera = null;
     //扭曲
-    MaterialProperty _TwistSpeed = null;
-    MaterialProperty _TwistMap = null;
-    MaterialProperty _TwistStrength = null;
+    MaterialProperty TwistSpeed = null;
+    MaterialProperty TwistMap = null;
+    MaterialProperty TwistStrength = null;
+    //遮罩
+    MaterialProperty MaskMap = null;
+    MaterialProperty MaskTwistStrength = null;
+    MaterialProperty MaskSoft = null;
     //溶解
-    MaterialProperty _DissolveMaskMap = null;
-    MaterialProperty _DissolveSpeed = null;
-    MaterialProperty _Dissolve = null;
-    MaterialProperty _DissolveMap = null;
-    MaterialProperty _DissolveSharpen = null;
-    MaterialProperty _DissolveSideColor = null;
-    MaterialProperty _DissolveSideWidth = null;
+    MaterialProperty DissolveMaskMap = null;
+    MaterialProperty DissolveSpeed = null;
+    MaterialProperty Dissolve = null;
+    MaterialProperty DissolveMap = null;
+    MaterialProperty DissolveSharpen = null;
+    MaterialProperty DissolveSideColor = null;
+    MaterialProperty DissolveSideWidth = null;
     
     static bool Foldout(bool display, string title)
     {
@@ -86,17 +91,21 @@ public class Effect_Distort_ShaderGUI : ShaderGUI
         SoftParticle = FindProperty("_SoftParticle", props);
         MoveToCamera = FindProperty("_MoveToCamera", props);
         
-        _TwistSpeed = FindProperty("_TwistSpeed", props);
-        _TwistMap = FindProperty("_TwistMap", props);
-        _TwistStrength = FindProperty("_TwistStrength", props);
+        TwistSpeed = FindProperty("_TwistSpeed", props);
+        TwistMap = FindProperty("_TwistMap", props);
+        TwistStrength = FindProperty("_TwistStrength", props);
         
-        _DissolveMaskMap = FindProperty("_DissolveMaskMap", props);
-        _DissolveSpeed = FindProperty("_DissolveSpeed", props);
-        _Dissolve = FindProperty("_Dissolve", props);
-        _DissolveMap = FindProperty("_DissolveMap", props);
-        _DissolveSharpen = FindProperty("_DissolveSharpen", props);
-        _DissolveSideColor = FindProperty("_DissolveSideColor", props);
-        _DissolveSideWidth = FindProperty("_DissolveSideWidth", props);
+        MaskMap = FindProperty("_MaskMap", props);
+        MaskTwistStrength = FindProperty("_MaskTwistStrength", props);
+        MaskSoft = FindProperty("_MaskSoft", props);
+        
+        DissolveMaskMap = FindProperty("_DissolveMaskMap", props);
+        DissolveSpeed = FindProperty("_DissolveSpeed", props);
+        Dissolve = FindProperty("_Dissolve", props);
+        DissolveMap = FindProperty("_DissolveMap", props);
+        DissolveSharpen = FindProperty("_DissolveSharpen", props);
+        DissolveSideColor = FindProperty("_DissolveSideColor", props);
+        DissolveSideWidth = FindProperty("_DissolveSideWidth", props);
     }
     
     public override void OnGUI(MaterialEditor materialEditor, MaterialProperty[] props)
@@ -173,9 +182,21 @@ public class Effect_Distort_ShaderGUI : ShaderGUI
         _Twist_Foldout = Foldout(_Twist_Foldout, "扭曲");
         if (_Twist_Foldout)
         {
-            m_MaterialEditor.ShaderProperty(_TwistSpeed, "扭曲流动速度");
-            m_MaterialEditor.ShaderProperty(_TwistMap, "扭曲贴图(offset为流动方向)");
-            m_MaterialEditor.ShaderProperty(_TwistStrength, "扭曲强度");
+            m_MaterialEditor.ShaderProperty(TwistSpeed, "扭曲流动速度");
+            m_MaterialEditor.ShaderProperty(TwistMap, "扭曲贴图(offset为流动方向)");
+            m_MaterialEditor.ShaderProperty(TwistStrength, "扭曲强度");
+        }
+        EditorGUILayout.EndVertical();
+        
+        //--------------------------------------
+        //遮罩
+        EditorGUILayout.BeginVertical(EditorStyles.helpBox);
+        _Mask_Foldout = Foldout(_Mask_Foldout, "遮罩");
+        if (_Mask_Foldout)
+        {
+            m_MaterialEditor.ShaderProperty(MaskMap, "遮罩贴图");
+            m_MaterialEditor.ShaderProperty(MaskTwistStrength, "遮罩图被扭曲的强度");
+            m_MaterialEditor.ShaderProperty(MaskSoft, "遮罩硬度");
         }
         EditorGUILayout.EndVertical();
         
@@ -185,13 +206,13 @@ public class Effect_Distort_ShaderGUI : ShaderGUI
         _Dissolve_Foldout = Foldout(_Dissolve_Foldout, "溶解");
         if (_Dissolve_Foldout)
         {
-            m_MaterialEditor.ShaderProperty(_DissolveMaskMap, "溶解的遮罩贴图");
-            m_MaterialEditor.ShaderProperty(_DissolveSpeed, "溶解流动速度");
-            m_MaterialEditor.ShaderProperty(_Dissolve, "溶解进度");
-            m_MaterialEditor.ShaderProperty(_DissolveMap, "溶解贴图");
-            m_MaterialEditor.ShaderProperty(_DissolveSharpen, "溶解硬度");
-            m_MaterialEditor.ShaderProperty(_DissolveSideColor, "溶解边缘颜色");
-            m_MaterialEditor.ShaderProperty(_DissolveSideWidth, "溶解边缘宽度(溶解较硬需要0.5以上)");
+            m_MaterialEditor.ShaderProperty(DissolveMaskMap, "溶解的遮罩贴图");
+            m_MaterialEditor.ShaderProperty(DissolveSpeed, "溶解流动速度");
+            m_MaterialEditor.ShaderProperty(Dissolve, "溶解进度");
+            m_MaterialEditor.ShaderProperty(DissolveMap, "溶解贴图");
+            m_MaterialEditor.ShaderProperty(DissolveSharpen, "溶解硬度");
+            m_MaterialEditor.ShaderProperty(DissolveSideColor, "溶解边缘颜色");
+            m_MaterialEditor.ShaderProperty(DissolveSideWidth, "溶解边缘宽度(溶解较硬需要0.5以上)");
         }
         EditorGUILayout.EndVertical();
         
