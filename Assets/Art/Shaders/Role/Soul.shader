@@ -6,8 +6,8 @@ Shader "KIIF/Soul"
         [MainTexture] _BaseMap("Albedo", 2D) = "white" {}
     	_ColorIntensity("ColorIntensity", Float) = 1
     	
-		[HDR]_InnerColor("InnerColor", Color) = (0,0.6279116,1,1)
-		[HDR]_OuterColor("OuterColor", Color) = (0.0604372,0,1,1)
+		[HDR]_InnerColor("InnerColor", Color) = (0, 0.3, 0.9, 1)
+		[HDR]_OuterColor("OuterColor", Color) = (0, 0.45, 0.75, 1)
 		_FresnelPower("FresnelPower", Float) = 5
 		_Dissolve("Dissolve", Range( 0 , 1)) = 0
         _DissolveMap("溶解贴图", 2D) = "white" {}

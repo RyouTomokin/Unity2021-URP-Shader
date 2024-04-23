@@ -36,12 +36,14 @@
         [Space(20)]
         [NoScaleOffset] _EmissionMap("R:自发光 G:特效光 B:融解图", 2D) = "black" {}
         [HDR] _EmissionColor("自发光颜色", Color) = (0,0,0)
+        [HDR] _EffectColor("特效光颜色", Color) = (0,0,0)        
         [Toggle(_EMISSIONALBEDO_ON)] _EmissionAlbedo("基础色发光", Float) = 0.0
         _EmissionStrength("自发光强度", Range(0.0, 1.0)) = 0.0
         
         [Header(Outline)]
         [Space]
         _OutlineColor("描边颜色", Color) = (0,0,0,0)
+        _OutlineBaseFactor("描边受基础色影响", Range(0, 1)) = 1
         _OutlineWidth("描边粗细", Range(0, 5)) = 0.5
         
         [Header(Gold body)]
@@ -170,6 +172,8 @@
             half4 _GoldLightColor;
             half _GoldLightSize;
             half _GoldLightContrast;
+
+            half4 _EffectColor;
             
             half _Melt;
             half _MeltEdgeSize;
@@ -321,6 +325,8 @@
                 #else
                 color.rgb += pbrData.emissionColor;
                 #endif
+                //特效光
+                color.rgb += _EffectColor.rgb * Emission.g;
                 half4 opaqueColor = color;
 
                 //溶解变黑
@@ -406,6 +412,7 @@
 
             half4 _BaseColor;
             half4 _OutlineColor;
+            half _OutlineBaseFactor;
             half _OutlineWidth;
             half _Cutoff;
             
@@ -498,6 +505,7 @@
                 clip(alpha - _Cutoff);
                 #endif
 
+                albedoAlpha = lerp(half4(1,1,1,1), albedoAlpha, _OutlineBaseFactor);
                 half3 color = _OutlineColor.rgb * albedoAlpha.rgb;
                 return half4(color, 1);
             }
