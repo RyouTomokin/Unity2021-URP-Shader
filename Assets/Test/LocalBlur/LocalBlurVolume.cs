@@ -4,6 +4,6 @@ using UnityEngine.Rendering;
 public class LocalBlurVolume : VolumeComponent
 {
     public BoolParameter isActive = new BoolParameter(true);
-    public ClampedFloatParameter blurRadius = new ClampedFloatParameter(0.003f, 0.0f, 0.005f);
+    public ClampedFloatParameter blurRadius = new ClampedFloatParameter(1.0f, 0.0f, 2.0f);
     public ClampedIntParameter iteration = new ClampedIntParameter(3, 1, 4);
 }

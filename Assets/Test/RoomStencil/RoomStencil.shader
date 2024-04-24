@@ -76,6 +76,8 @@
             ENDHLSL
         }
         
+        //TODO:模糊的Shader Pass整理成单独的文件
+        
         //Box模糊 1
         Pass                
         {

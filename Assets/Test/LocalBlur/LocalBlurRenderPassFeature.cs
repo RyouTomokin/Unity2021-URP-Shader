@@ -10,7 +10,7 @@ public class LocalBlurRenderPassFeature : ScriptableRendererFeature
     public class Settings
     {
         //设置渲染顺序
-        public RenderPassEvent renderPassEvent = RenderPassEvent.BeforeRenderingPostProcessing;
+        public RenderPassEvent renderPassEvent = RenderPassEvent.BeforeRenderingTransparents;
         public Shader shader;
     }
     /// <summary>
@@ -20,12 +20,17 @@ public class LocalBlurRenderPassFeature : ScriptableRendererFeature
     {
         private static readonly string RenderTag = "LocalBlur";
         
+        private static readonly int BlurBufferID = Shader.PropertyToID("_BlurBuffer");
+        
+        private int[] downSampleRT;
+        private int[] upSampleRT;
+        
         private LocalBlurVolume _postProcessVolume;         //后处理的Volume
         
         private Material _postProcessMat;                   //后处理使用材质
         private RenderTargetIdentifier _currentTarget;      //设置当前渲染目标
         
-        private float _blurRadius;
+        private float _BlurRange;
         private int _iteration;
         
         #region 设置渲染事件
@@ -101,20 +106,62 @@ public class LocalBlurRenderPassFeature : ScriptableRendererFeature
         void Render(CommandBuffer cmd, ref RenderingData renderingData)
         {
             //从Volume获取参数并设置到材质中
-            _blurRadius = _postProcessVolume.blurRadius.value;
+            _BlurRange = _postProcessVolume.blurRadius.value;
             _iteration = _postProcessVolume.iteration.value;
-            _postProcessMat.SetFloat("_BlurRadius", _blurRadius);
+            _postProcessMat.SetFloat("_BlurRange", _BlurRange);
             
             ref var cameraData = ref renderingData.cameraData;
             var camera = cameraData.camera;
             
             // Blitter.BlitCameraTexture();
             cmd.SetRenderTarget(_currentTarget);
-            cmd.SetViewProjectionMatrices(Matrix4x4.identity, Matrix4x4.identity);
-            cmd.DrawMesh(RenderingUtils.fullscreenMesh, Matrix4x4.identity, _postProcessMat, 0, 0);
-            cmd.SetViewProjectionMatrices(camera.worldToCameraMatrix, camera.projectionMatrix);
+            // cmd.SetViewProjectionMatrices(Matrix4x4.identity, Matrix4x4.identity);
+            // cmd.DrawMesh(RenderingUtils.fullscreenMesh, Matrix4x4.identity, _postProcessMat, 0, 0);
+            // cmd.SetViewProjectionMatrices(camera.worldToCameraMatrix, camera.projectionMatrix);
             
-            CommandBufferPool.Release(cmd);
+            //降采样升采样去模糊处理
+            RenderTargetIdentifier tmpRT = _currentTarget;
+            int width = camera.scaledPixelWidth;
+            int height = camera.scaledPixelHeight;
+            // int preDownSample = _postProcessVolume.preDownSample.value;
+            downSampleRT = new int[_iteration];
+            upSampleRT = new int[_iteration];
+
+            //声明需要使用的RT的ID
+            for (int i = 0; i < _iteration; i++)
+            {
+                downSampleRT[i] = Shader.PropertyToID("DownSample" + i);
+                upSampleRT[i] = Shader.PropertyToID("UpSample" + i);
+            }
+
+            // width  = width >> preDownSample;
+            // height = height >> preDownSample;
+            //降采样
+            for (int i = 0; i < _iteration; i++)
+            {
+                width = Mathf.Max(width>>1, 1);
+                height = Mathf.Max(height>>1, 1);
+                cmd.GetTemporaryRT(downSampleRT[i], width, height, 0, FilterMode.Bilinear, RenderTextureFormat.Default);
+                cmd.GetTemporaryRT(upSampleRT[i], width, height, 0, FilterMode.Bilinear, RenderTextureFormat.Default);
+
+                cmd.Blit(tmpRT, downSampleRT[i], _postProcessMat, 1);
+                tmpRT = downSampleRT[i];
+            }
+            //升采样
+            for (int j = _iteration - 1; j >= 0; j--)
+            {
+                cmd.Blit(tmpRT, upSampleRT[j], _postProcessMat, 2);
+                tmpRT = upSampleRT[j];
+            }
+            
+            cmd.SetGlobalTexture(BlurBufferID, upSampleRT[0]);
+            
+            //释放TempRT
+            for (int i = 0; i < _iteration; i++)
+            {
+                cmd.ReleaseTemporaryRT(downSampleRT[i]);
+                cmd.ReleaseTemporaryRT(upSampleRT[i]);
+            }
         }
 
         #endregion
