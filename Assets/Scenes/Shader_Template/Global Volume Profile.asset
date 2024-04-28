@@ -1,21 +1,5 @@
 %YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
---- !u!114 &-2935666988304178353
-MonoBehaviour:
-  m_ObjectHideFlags: 3
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 0}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 464a58be960bcf84e972c8d9b28fdfcd, type: 3}
-  m_Name: DesaturateStencilVolume
-  m_EditorClassIdentifier: 
-  active: 1
-  stencilRefValue:
-    m_OverrideState: 1
-    m_Value: 1
 --- !u!114 &11400000
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -30,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   components:
   - {fileID: 1773641697348158871}
-  - {fileID: -2935666988304178353}
+  - {fileID: 4459800122599545809}
 --- !u!114 &1773641697348158871
 MonoBehaviour:
   m_ObjectHideFlags: 3
@@ -50,3 +34,25 @@ MonoBehaviour:
   iteration:
     m_OverrideState: 1
     m_Value: 4
+--- !u!114 &4459800122599545809
+MonoBehaviour:
+  m_ObjectHideFlags: 3
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 464a58be960bcf84e972c8d9b28fdfcd, type: 3}
+  m_Name: DesaturateStencilVolume
+  m_EditorClassIdentifier: 
+  active: 1
+  stencilRefValue:
+    m_OverrideState: 1
+    m_Value: 1
+  desaturate:
+    m_OverrideState: 1
+    m_Value: 1
+  stencilCompare:
+    m_OverrideState: 1
+    m_Value: 5

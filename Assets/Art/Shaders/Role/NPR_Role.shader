@@ -197,7 +197,8 @@
                 
                 NPRColor = NPRColor * colorLayering * LightIntensity + NPRColor2;
                 
-                color.rgb = lerp(NPRColor, color.rgb, pbrData.metallic);
+                half blendFactor = lerp(0.2, 1, saturate(GIIntensity));
+                color.rgb = lerp(NPRColor, color.rgb, pbrData.metallic * blendFactor);
                 
                 //区域高光
                 float3 halfVec = SafeNormalize(float3(mainLight.direction) + float3(pbrData.viewDirectionWS));

@@ -129,7 +129,8 @@
                 // -------------------------------------
                 //积雪
                 
-                SnowFunction(pbrData.albedoAlpha.a, input.uv, pbrData.TangentToWorld,
+                float2 snowUV = input.positionWS.xz;
+                SnowFunction(pbrData.albedoAlpha.a, snowUV, pbrData.TangentToWorld,
                     pbrData.albedo, pbrData.smoothness, pbrData.metallic, pbrData.normalWS);
                 
                 // -------------------------------------

@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
@@ -12,6 +13,7 @@ public class DesaturateStencilRenderPassFeature : ScriptableRendererFeature
         //设置渲染顺序
         public RenderPassEvent renderPassEvent = RenderPassEvent.BeforeRenderingTransparents;
         public Shader shader;
+        // public bool desaturateOpaque = false;
     }
     /// <summary>
     /// 自定义可编程的RenderPass
@@ -30,11 +32,10 @@ public class DesaturateStencilRenderPassFeature : ScriptableRendererFeature
         private Material _postProcessMat;                   //后处理使用材质
         private RenderTargetIdentifier _currentTarget;      //设置当前渲染目标
         
-        private float _BlurRange;
-        private int _iteration;
+        private bool _desaturateOpaque;
         
         #region 设置渲染事件
-        public DesaturateStencilRenderPass(RenderPassEvent evt, Shader postProcessShader)
+        public DesaturateStencilRenderPass(RenderPassEvent evt, Shader postProcessShader, Settings settings)
         {
             renderPassEvent = evt;
             var shader = postProcessShader;
@@ -46,6 +47,10 @@ public class DesaturateStencilRenderPassFeature : ScriptableRendererFeature
             }
             //如果存在则新建材质
             _postProcessMat = CoreUtils.CreateEngineMaterial(postProcessShader);
+
+            _desaturateOpaque = evt == RenderPassEvent.BeforeRenderingTransparents;
+
+            // _desaturateOpaque = settings.desaturateOpaque;
         }
         #endregion
         
@@ -107,16 +112,36 @@ public class DesaturateStencilRenderPassFeature : ScriptableRendererFeature
         {
             //从Volume获取参数并设置到材质中
             _postProcessMat.SetInt("_RefValue", _postProcessVolume.stencilRefValue.value);
+            _postProcessMat.SetFloat("_Desaturate", _postProcessVolume.desaturate.value);
+            _postProcessMat.SetInt("_StencilComp", (int)_postProcessVolume.stencilCompare.value);
             
             ref var cameraData = ref renderingData.cameraData;
             var camera = cameraData.camera;
             
-            // var source = _currentTarget;
-            // cmd.SetRenderTarget(_currentTarget);
+            var source = _currentTarget;
+
+            if (!_desaturateOpaque)
+            {
+                //暂存当前的颜色并传递给
+                int tmpSceneColor = Shader.PropertyToID("tmpSceneColor_desaturate");
+                RenderTextureDescriptor desc = cameraData.cameraTargetDescriptor;
+                cmd.GetTemporaryRT(tmpSceneColor, desc);
+                cmd.Blit(source, tmpSceneColor);
+                cmd.SetGlobalTexture("_CameraTransparentTexture", tmpSceneColor);
+                
+                cmd.Blit(null, source, _postProcessMat, 0);
+                
+                cmd.ReleaseTemporaryRT(tmpSceneColor);
+            }
+            else
+            {
+                cmd.SetRenderTarget(_currentTarget);
+                cmd.Blit(null, source, _postProcessMat, 1);
+                // cmd.SetViewProjectionMatrices(Matrix4x4.identity, Matrix4x4.identity);
+                // cmd.DrawMesh(RenderingUtils.fullscreenMesh, Matrix4x4.identity, _postProcessMat, 0, 1);
+                // cmd.SetViewProjectionMatrices(camera.worldToCameraMatrix, camera.projectionMatrix);
+            }
             
-            cmd.SetViewProjectionMatrices(Matrix4x4.identity, Matrix4x4.identity);
-            cmd.DrawMesh(RenderingUtils.fullscreenMesh, Matrix4x4.identity, _postProcessMat, 0, 0);
-            cmd.SetViewProjectionMatrices(camera.worldToCameraMatrix, camera.projectionMatrix);
         }
 
         #endregion
@@ -132,7 +157,7 @@ public class DesaturateStencilRenderPassFeature : ScriptableRendererFeature
     public override void Create()
     {
         this.name = "DesaturateStencil";
-        m_ScriptablePass = new DesaturateStencilRenderPass(settings.renderPassEvent, settings.shader);
+        m_ScriptablePass = new DesaturateStencilRenderPass(settings.renderPassEvent, settings.shader, settings);
     }
 
     // Here you can inject one or multiple render passes in the renderer.
