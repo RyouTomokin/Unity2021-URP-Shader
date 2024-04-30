@@ -23,7 +23,7 @@ Material:
     m_Ints: []
     m_Floats:
     - _DispersionControl: 1
-    - _DispersionStrength: 0.2
+    - _DispersionStrength: 0.5
     - _RadialControl: 1
     - _RadialStrength: 10
     m_Colors:

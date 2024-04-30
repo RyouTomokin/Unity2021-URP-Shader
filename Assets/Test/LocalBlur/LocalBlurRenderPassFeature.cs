@@ -144,13 +144,13 @@ public class LocalBlurRenderPassFeature : ScriptableRendererFeature
                 cmd.GetTemporaryRT(downSampleRT[i], width, height, 0, FilterMode.Bilinear, RenderTextureFormat.Default);
                 cmd.GetTemporaryRT(upSampleRT[i], width, height, 0, FilterMode.Bilinear, RenderTextureFormat.Default);
 
-                cmd.Blit(tmpRT, downSampleRT[i], _postProcessMat, 1);
+                cmd.Blit(tmpRT, downSampleRT[i], _postProcessMat, 0);
                 tmpRT = downSampleRT[i];
             }
             //升采样
             for (int j = _iteration - 1; j >= 0; j--)
             {
-                cmd.Blit(tmpRT, upSampleRT[j], _postProcessMat, 2);
+                cmd.Blit(tmpRT, upSampleRT[j], _postProcessMat, 1);
                 tmpRT = upSampleRT[j];
             }
             
