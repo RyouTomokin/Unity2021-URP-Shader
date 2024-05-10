@@ -94,11 +94,12 @@ inline void PBRInitialize(Varyings input, out PBRData out_data)
     out_data = (PBRData)0;
     float2 uv = input.uv;
     out_data.albedoAlpha = SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, uv);
-    out_data.alpha = out_data.albedoAlpha.a * _BaseColor.a;
+    out_data.albedoAlpha *= _BaseColor;
+    out_data.alpha = out_data.albedoAlpha.a;
     #if defined(_ALPHATEST_ON)
     clip(out_data.alpha - _Cutoff);
     #endif
-    out_data.albedo = out_data.albedoAlpha.rgb * _BaseColor.rgb;
+    out_data.albedo = out_data.albedoAlpha.rgb;
 
     out_data.emissionColor = _EmissionColor.rgb * _EmissionStrength;
     out_data.positionWS = input.positionWS;
