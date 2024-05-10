@@ -543,7 +543,7 @@
 
             #include "Packages/com.unity.render-pipelines.universal/Shaders/LitInput.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/Shaders/ShadowCasterPass.hlsl"
-            #include "Assets/Art/Shaders/Library/KIIFShadowPass.hlsl"
+            #include "Assets/Art/Shaders/Library/KIIFShadowPassMelt.hlsl"
             
             ENDHLSL
         }

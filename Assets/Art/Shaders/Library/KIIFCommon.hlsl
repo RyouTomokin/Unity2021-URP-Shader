@@ -68,11 +68,11 @@ inline half2 Dissolve(half factor, half dissolveSrc, half dissolveMask = 0,
                       half sideWidth = 0, half sharpen = 1)
 {
     half dissolve = dissolveSrc;
-    // dissolve = (dissolve + dissolveMask - 1);        //溶解遮罩dissolve-(1-mask)
-    dissolve = saturate(dissolve + dissolveMask - factor);      //溶解遮罩dissolve-(1-mask)
-    dissolve = dissolve + 1 - (2 * factor);             //溶解程度dissolve-2(factor-0.5)
+    // dissolve = (dissolve + dissolveMask - 1);            //溶解遮罩dissolve-(1-mask)
+    dissolve = saturate(dissolve + dissolveMask - factor);  //溶解遮罩dissolve-(1-mask)
+    dissolve = dissolve + 1 - (2 * factor);                 //溶解程度dissolve-2(factor-0.5)
     half dissolveSide = step(0, dissolve) - step(sideWidth, dissolve);
-    dissolve = (dissolve - 0.5) * sharpen + 0.5;        //溶解边缘锐化
+    dissolve = (dissolve - 0.5) * sharpen + 0.5;            //溶解边缘锐化
     dissolve = saturate(dissolve);
 
     return half2(dissolve, dissolveSide);
