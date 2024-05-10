@@ -163,7 +163,7 @@
                 Light mainLight = GetMainLight(shadowCoord);
                 float mainLightIntensity = Max3(mainLight.color.r, mainLight.color.g, mainLight.color.b);
                 mainLightIntensity = min(mainLightIntensity, 1.2);
-                float GIIntensity = Desaturate(_GlossyEnvironmentColor, 0.0);
+                float GIIntensity = Desaturate(_GlossyEnvironmentColor.rgb, 0.0).r;
                 // float LightIntensity = max(mainLightIntensity, GIIntensity);
                 float LightIntensity = (mainLightIntensity + GIIntensity) * 0.5;
                 // half lightFact = mainLightIntensity/(mainLightIntensity + GIIntensity);
@@ -285,7 +285,7 @@
 
                 //计算FOV，平衡不同FOV视角下的描边粗细
                 half t = unity_CameraProjection._m11;
-                half fov = pow(t, 0.8);     //真正的FOV=atan(1/t)*2 * (180/pi);
+                half fov = pow(abs(t), 0.8);     //真正的FOV=atan(1/t)*2 * (180/pi);
                 
                 extendDis *= fov;
                 
