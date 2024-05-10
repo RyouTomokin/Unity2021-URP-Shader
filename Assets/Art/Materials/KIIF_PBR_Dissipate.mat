@@ -1,0 +1,64 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!21 &2100000
+Material:
+  serializedVersion: 8
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: KIIF_PBR_Dissipate
+  m_Shader: {fileID: 4800000, guid: 0c3580022278922459986f9e224ccf61, type: 3}
+  m_ValidKeywords:
+  - _ALPHATEST_ON
+  m_InvalidKeywords: []
+  m_LightmapFlags: 4
+  m_EnableInstancingVariants: 0
+  m_DoubleSidedGI: 0
+  m_CustomRenderQueue: -1
+  stringTagMap: {}
+  disabledShaderPasses: []
+  m_SavedProperties:
+    serializedVersion: 3
+    m_TexEnvs:
+    - _BaseMap:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _BumpMap:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _DissolveMap:
+        m_Texture: {fileID: 2800000, guid: e00019d4b26954c40971af8961bdb57e, type: 3}
+        m_Scale: {x: 2, y: 2}
+        m_Offset: {x: 0, y: 0}
+    - _SMAEMap:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    m_Ints: []
+    m_Floats:
+    - _AlphaClip: 0
+    - _AlphaTest: 1
+    - _BumpScale: 1
+    - _Cull: 2
+    - _Cutoff: 0.5
+    - _Dissipate: 0.4
+    - _DissipateEdgeSize: 0.02
+    - _EmissionStrength: 0
+    - _Metallic: 0
+    - _OcclusionStrength: 1
+    - _RefValue: 0
+    - _Smoothness: 0.5
+    - _StencilComp: 8
+    - _StencilPass: 0
+    - _Surface: 0
+    - _WorldPositionAdjust: 0.5
+    - _WorldPositionOffset: 1
+    - _ZWrite: 1
+    m_Colors:
+    - _BaseColor: {r: 1, g: 1, b: 1, a: 1}
+    - _DissipateEdgeColor: {r: 0, g: 1.8745098, b: 2, a: 1}
+    - _EmissionColor: {r: 0, g: 0, b: 0, a: 1}
+  m_BuildTextureStacks: []
