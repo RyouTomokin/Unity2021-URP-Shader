@@ -1,5 +1,9 @@
 ﻿Shader "Hidden/DualBoxBlur"
 {
+    Properties
+    {
+    	[HideInInspector] _MainTex("MainTex", 2D) = "white" {}
+    }
     SubShader
     {
         Tags { "RenderType"="Opaque" "RenderPipeline"="UniversalPipeline"}

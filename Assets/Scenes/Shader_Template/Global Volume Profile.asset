@@ -28,7 +28,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 4ef0a9341574c4548a0720eb0bfca14e, type: 3}
   m_Name: LocalBlurVolume
   m_EditorClassIdentifier: 
-  active: 0
+  active: 1
   blurRadius:
     m_OverrideState: 1
     m_Value: 1
@@ -88,7 +88,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 464a58be960bcf84e972c8d9b28fdfcd, type: 3}
   m_Name: DesaturateStencilVolume
   m_EditorClassIdentifier: 
-  active: 0
+  active: 1
   stencilRefValue:
     m_OverrideState: 1
     m_Value: 1
