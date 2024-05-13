@@ -1,22 +1,28 @@
-Shader "KIIF/Effect/Template"
+Shader "KIIF/Effect/EffectDecal"
 {
     Properties
     {
         [MainColor][HDR] _BaseColor("Color", Color) = (1,1,1,1)
         [MainTexture] _BaseMap("Albedo", 2D) = "white" {}
         _Cutoff("Alpha Cutoff", Range(0.0, 1.0)) = 0
-        [Toggle] _SoftParticlesEnabled("__softparticlesenabled", Float) = 0.0
-        _SoftParticle("软粒子", Range(0 , 10)) = 1
-        _MoveToCamera("移向摄像机", Range(-20 , 20)) = 0
         
-        [Enum(Alpha,0,Add,1)] _Blend("__mode", Float) = 0.0
-        [Enum(UnityEngine.Rendering.CullMode)] _Cull("__cull", Float) = 2.0
-        [Enum(Close,0,Open,1)] _DepthTest("深度测试", Float) = 1.0
+        [Enum(Alpha,10,Add,1)] _Blend("Blend Mode", Int) = 0
+//        [Enum(UnityEngine.Rendering.CullMode)] _Cull("__cull", Float) = 2.0
+//        [Enum(Close,0,Open,1)] _DepthTest("深度测试", Float) = 1.0
+        
+        [HDR] _EmissionColor("自发光颜色", Color) = (0,0,0)
+        _EmissionStrength("自发光强度", Range(0.0, 1.0)) = 0.0
 
-        [HideInInspector] _SrcBlend("__src", Float) = 1.0
-        [HideInInspector] _DstBlend("__dst", Float) = 0.0
-        [HideInInspector] _ZTest("_ZTest", Float) = 0.0
-        [HideInInspector] _ZWrite("__zw", Float) = 0.0
+        [Space(20)]
+        [Header(Stencil)]
+        [Space]
+        _RefValue("Ref Value",Int) = 1
+        [Enum(UnityEngine.Rendering.CompareFunction)] _StencilComp("Stencil Comp",Int) = 5      //默认Greater
+        [Enum(UnityEngine.Rendering.StencilOp)] _StencilPass("Stencil Pass",Int) = 0            //默认Keep
+//        [HideInInspector] _SrcBlend("__src", Float) = 1.0
+//        [HideInInspector] _DstBlend("__dst", Float) = 0.0
+//        [HideInInspector] _ZTest("_ZTest", Float) = 0.0
+//        [HideInInspector] _ZWrite("__zw", Float) = 0.0
     }
     SubShader
     {
@@ -29,18 +35,23 @@ Shader "KIIF/Effect/Template"
         {
             Name "ForwardLit"
             
-            Blend [_SrcBlend][_DstBlend]
-            Cull [_Cull]
-            ZTest [_ZTest]
-            Zwrite Off
+            Blend SrcAlpha [_Blend]
+            Stencil
+            {
+                Ref [_RefValue]
+                Comp [_StencilComp]
+                Pass [_StencilPass]
+            }
+            
+            ZWrite Off
+            ZTest Off
+            Cull Front
             
             HLSLPROGRAM
             #pragma target 2.0
 
             // -------------------------------------
             // Material Keywords
-            // #pragma shader_feature_local _NORMALMAP
-            // #pragma shader_feature_local_fragment _EMISSION
 
             // -------------------------------------
             // Particle Keywords
@@ -60,7 +71,7 @@ Shader "KIIF/Effect/Template"
             #pragma fragment frag
 
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
-            #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Color.hlsl"
+            // #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Color.hlsl"
             #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/UnityInstancing.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/ParticlesInstancing.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/DeclareDepthTexture.hlsl"
@@ -75,15 +86,34 @@ Shader "KIIF/Effect/Template"
 
             struct VaryingsParticle
             {
-                float4 clipPos                  : SV_POSITION;
                 float2 texcoord                 : TEXCOORD0;
-                half4 color                     : COLOR;
-                float3 positionWS               : TEXCOORD5;
+                half4 color                     : COLOR;        
+                
+                // DECLARE_LIGHTMAP_OR_SH(lightmapUV, vertexSH, 1);
+
+                float3 positionWS               : TEXCOORD2;
+
+                // #ifdef _NORMALMAP
+                // float4 normalWS                 : TEXCOORD3;    // xyz: normal, w: viewDir.x
+                // float4 tangentWS                : TEXCOORD4;    // xyz: tangent, w: viewDir.y
+                // float4 bitangentWS              : TEXCOORD5;    // xyz: bitangent, w: viewDir.z
+                // #else
+                // float3 normalWS                 : TEXCOORD3;
+                // float3 viewDirWS                : TEXCOORD4;
+                // #endif
 
                 #if defined(_SOFTPARTICLES_ON) || defined(_FADING_ON) || defined(_DISTORTION_ON)
                     float4 projectedPosition: TEXCOORD6;
                 #endif
 
+                #if defined(REQUIRES_VERTEX_SHADOW_COORD_INTERPOLATOR)
+                float4 shadowCoord              : TEXCOORD7;
+                #endif
+                #ifdef _SCREENPOSITION_ON
+                float4 screenPos                : TEXCOORD8;
+                #endif
+
+                float4 positionCS               : SV_POSITION;
                 UNITY_VERTEX_INPUT_INSTANCE_ID
                 UNITY_VERTEX_OUTPUT_STEREO
             };
@@ -92,37 +122,25 @@ Shader "KIIF/Effect/Template"
             float4 _BaseMap_ST;
             half4 _BaseColor;
             half _Cutoff;
-            half _SoftParticle;
-            half _MoveToCamera;
+            float3 _EmissionColor;
+            half _EmissionStrength;
             CBUFFER_END
 
             TEXTURE2D(_BaseMap);            SAMPLER(sampler_BaseMap);
-            // TEXTURE2D(_EmissionMap);        SAMPLER(sampler_EmissionMap);
             
             VaryingsParticle vert (AttributesParticle input)
             {
                 VaryingsParticle output = (VaryingsParticle)0;
-
+            
                 UNITY_SETUP_INSTANCE_ID(input);
                 UNITY_TRANSFER_INSTANCE_ID(input, output);
                 UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(output);
-
-                //顶点向摄像机方向偏移，以实现显示到其他物体前的效果
-                float3 cameraPositionOS = TransformWorldToObject(GetCameraPositionWS());
-                float3 offsetPositionOS = input.positionOS.xyz + normalize(cameraPositionOS - input.positionOS.xyz) * _MoveToCamera;
-
-                VertexPositionInputs vertexInput = GetVertexPositionInputs(offsetPositionOS);
-                // VertexNormalInputs normalInput = GetVertexNormalInputs(input.normalOS, input.tangentOS);
-
-            //     half fogFactor = 0.0;
-            // #if !defined(_FOG_FRAGMENT)
-            //     fogFactor = ComputeFogFactor(vertexInput.positionCS.z);
-            // #endif
-
+            
+                VertexPositionInputs vertexInput = GetVertexPositionInputs(input.positionOS.xyz);
+                
                 // position ws is used to compute eye depth in vertFading
-                // output.positionWS.xyz = vertexInput.positionWS;
-                // output.positionWS.w = fogFactor;
-                output.clipPos = vertexInput.positionCS;
+                output.positionWS = vertexInput.positionWS;
+                output.positionCS = vertexInput.positionCS;
                 // output.color = GetParticleColor(input.color);
                 #if defined(UNITY_PARTICLE_INSTANCING_ENABLED)
                 #if !defined(UNITY_PARTICLE_INSTANCE_DATA_NO_COLOR)
@@ -132,16 +150,12 @@ Shader "KIIF/Effect/Template"
                 #endif
                 #endif
                 output.color = input.color;
-
+            
                 output.texcoord = TRANSFORM_TEX(input.texcoord, _BaseMap);
-
-                output.positionWS = vertexInput.positionWS;
+            
                 #if defined(_SOFTPARTICLES_ON) || defined(_FADING_ON) || defined(_DISTORTION_ON)
                 output.projectedPosition = vertexInput.positionNDC;
                 #endif
-                // #ifdef _SCREENPOSITION_ON
-                // output.screenPos = vertexInput.positionNDC/output.clipPos.w;
-                // #endif
                 
                 return output;
             }
@@ -151,65 +165,49 @@ Shader "KIIF/Effect/Template"
                 UNITY_SETUP_INSTANCE_ID(input);
                 UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(input);
 
+                // -------------------------------------
                 // 初始化粒子参数
-                float2 uv = input.texcoord;
+                
+                // 要计算用于采样深度缓冲区的 UV 坐标，
+                // 请将像素位置除以渲染目标分辨率
+                // _ScaledScreenParams。
+                float2 screenUV = input.positionCS.xy / _ScaledScreenParams.xy;
+                // 从摄像机深度纹理中采样深度。
+                #if UNITY_REVERSED_Z
+                    real depth = SampleSceneDepth(screenUV);
+                #else
+                    //  调整 Z 以匹配 OpenGL 的 NDC ([-1, 1])
+                    real depth = lerp(UNITY_NEAR_CLIP_VALUE, 1, SampleSceneDepth(UV));
+                #endif
                 float4 vertexColor = input.color;
 
+                // -------------------------------------
+                // 重建世界空间位置。
+                float3 worldPos = ComputeWorldSpacePosition(screenUV, depth, UNITY_MATRIX_I_VP);
+                // 剔除之外的像素
+                float3 localPos = mul(unity_WorldToObject, float4(worldPos,1)).xyz;
+                clip(0.5 - abs(localPos));
+                // 贴花UV
+                float2 decalUV = localPos.xz + 0.5;
+                decalUV = decalUV * _BaseMap_ST.xy + _BaseMap_ST.zw;
+                // 用重建的世界坐标计算阴影UV
+                // input.positionWS = worldPos;
+
+                // -------------------------------------
                 // 基础功能
-                half4 color = SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, uv);
+                half4 color = SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, decalUV);
                 color *= _BaseColor * vertexColor;
                 clip(color.a - _Cutoff);
-                
-                // 软粒子
-                #ifdef _SOFTPARTICLES_ON
-                float fade = 1;
-                if (_SoftParticle > 0.0)
-                {
-                    float rawDepth = SampleSceneDepth(input.projectedPosition.xy / input.projectedPosition.w).r;
-                    float sceneZ = (unity_OrthoParams.w == 0) ? LinearEyeDepth(rawDepth, _ZBufferParams) : LinearDepthToEyeDepth(rawDepth);
-                    float thisZ = LinearEyeDepth(input.positionWS, GetWorldToViewMatrix());
-                    fade = saturate((sceneZ - thisZ) / _SoftParticle);
-                }
-                color.a *= fade;
-                #endif
+
+                // -------------------------------------
+                color.rgb += _EmissionColor * _EmissionStrength;
+                color.a *= smoothstep(0.5, 0.4, abs(localPos.y));
                                 
                 return color;
             }
             ENDHLSL
         }
             
-        // ------------------------------------------------------------------
-        //  Depth Only pass.
-//        Pass
-//        {
-//            Name "DepthOnly"
-//            Tags{"LightMode" = "DepthOnly"}
-//
-//            ZWrite On
-//            ColorMask 0
-//            Cull[_Cull]
-//
-//            HLSLPROGRAM
-//            #pragma target 2.0
-//
-//            // -------------------------------------
-//            // Material Keywords
-//            #pragma shader_feature_local _ _ALPHATEST_ON
-//            #pragma shader_feature_local _ _FLIPBOOKBLENDING_ON
-//            #pragma shader_feature_local_fragment _ _COLOROVERLAY_ON _COLORCOLOR_ON _COLORADDSUBDIFF_ON
-//
-//            // -------------------------------------
-//            // Unity defined keywords
-//            #pragma multi_compile_instancing
-//            #pragma instancing_options procedural:ParticleInstancingSetup
-//
-//            #pragma vertex DepthOnlyVertex
-//            #pragma fragment DepthOnlyFragment
-//
-//            #include "Packages/com.unity.render-pipelines.universal/Shaders/Particles/ParticlesUnlitInput.hlsl"
-//            #include "Packages/com.unity.render-pipelines.universal/Shaders/Particles/ParticlesDepthOnlyPass.hlsl"
-//            ENDHLSL
-//        }
         
         // ------------------------------------------------------------------
         //  Scene view outline pass.
@@ -281,5 +279,5 @@ Shader "KIIF/Effect/Template"
             ENDHLSL
         }
     }
-    CustomEditor "Effect_ShaderGUI"
+//    CustomEditor "Effect_ShaderGUI"
 }

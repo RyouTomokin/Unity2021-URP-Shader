@@ -158,6 +158,13 @@ Shader "KIIF/Effect/Distort"
                 VertexPositionInputs vertexInput = GetVertexPositionInputs(offsetPositionOS);
 
                 output.clipPos = vertexInput.positionCS;
+                #if defined(UNITY_PARTICLE_INSTANCING_ENABLED)
+                #if !defined(UNITY_PARTICLE_INSTANCE_DATA_NO_COLOR)
+                    UNITY_PARTICLE_INSTANCE_DATA data = unity_ParticleInstanceData[unity_InstanceID];
+                    input.color = lerp(half4(1.0, 1.0, 1.0, 1.0), input.color, unity_ParticleUseMeshColors);
+                    input.color *= half4(UnpackFromR8G8B8A8(data.color));
+                #endif
+                #endif
                 output.color = input.color;
 
                 // 多套贴图，在PS中变换UV
