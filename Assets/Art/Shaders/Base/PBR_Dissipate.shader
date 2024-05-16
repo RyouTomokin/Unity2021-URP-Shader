@@ -28,6 +28,12 @@
         [HDR] _DissipateEdgeColor("融解边缘颜色", Color) = (1,1,1,1)
         
         [Space(20)]
+        [Header(BlendMode)]
+        [Space]
+        [Enum(UnityEngine.Rendering.BlendMode)] _SrcBlend("Src Value",Int) = 0
+        [Enum(UnityEngine.Rendering.BlendMode)] _DstBlend("Dst Value",Int) = 0
+        
+        [Space(20)]
         [Header(Stencil)]
         [Space]        
         _RefValue("Ref Value",Int) = 0
@@ -48,7 +54,7 @@
         {
             Name "ForwardLit"
             Tags{"LightMode" = "UniversalForward"}
-//            Blend SrcAlpha OneMinusSrcAlpha
+            Blend [_SrcBlend] [_DstBlend]
             Stencil
             {
                 Ref [_RefValue]
