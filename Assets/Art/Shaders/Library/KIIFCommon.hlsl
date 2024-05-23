@@ -133,4 +133,23 @@ half CheapContrast(half In, half Contrast)
     return clamp(temp, 0.0f, 1.0f);
 }
 
+/**
+ * \brief UV随着视角偏移，模拟深度
+ * \param tangentToWorld 切线空间转世界空间的矩阵
+ * \param cameraDir 摄像机的方向(也可以是摄像机到像素的方向)
+ * \param uv 原UV
+ * \param height 偏移高度，默认0.5(参考平面)不偏移
+ * \param heightRatio 偏移高度的系数
+ * \param plane 参考平面
+ * \return 偏移后的UV
+ */
+float2 BumpOffset(float3x3 tangentToWorld, float3 cameraDir, float2 uv, float height, float heightRatio = 0.05, float plane = 0.5)
+{
+    float _H = heightRatio * (height - plane);
+    float3 viewTS = mul(tangentToWorld, cameraDir);
+    float2 bumpUV = uv + viewTS.rg * _H;
+    
+    return bumpUV;
+}
+
 #endif

@@ -21,8 +21,12 @@ public class Effect_Distort_ShaderGUI : ShaderGUI
     MaterialProperty DepthTest = null;
     //基础颜色
     MaterialProperty BaseColor = null;
+    MaterialProperty Brighten = null;
+    MaterialProperty SelfMask = null;
     MaterialProperty BaseMap = null;
     MaterialProperty MainSpeed = null;
+    MaterialProperty MainClampEnabled = null;
+    MaterialProperty MainClamp = null;
     MaterialProperty Cutoff = null;
     MaterialProperty SoftParticlesEnabled = null;
     MaterialProperty SoftParticle = null;
@@ -84,8 +88,12 @@ public class Effect_Distort_ShaderGUI : ShaderGUI
         DepthTest = FindProperty("_DepthTest", props);
         
         BaseColor = FindProperty("_BaseColor", props);
+        Brighten = FindProperty("_Brighten", props);
+        SelfMask = FindProperty("_SelfMask", props);
         BaseMap = FindProperty("_BaseMap", props);
         MainSpeed = FindProperty("_MainSpeed", props);
+        MainClampEnabled = FindProperty("_MainClampEnabled", props);
+        MainClamp = FindProperty("_MainClamp", props);
         Cutoff = FindProperty("_Cutoff", props);
         SoftParticlesEnabled = FindProperty("_SoftParticlesEnabled", props);
         SoftParticle = FindProperty("_SoftParticle", props);
@@ -158,8 +166,12 @@ public class Effect_Distort_ShaderGUI : ShaderGUI
         {
             EditorGUI.indentLevel++;
             m_MaterialEditor.ShaderProperty(BaseColor, "颜色");
+            m_MaterialEditor.ShaderProperty(Brighten, "提亮");
+            m_MaterialEditor.ShaderProperty(SelfMask, "自我遮罩(R通道作为A通道)");
             m_MaterialEditor.ShaderProperty(BaseMap, "颜色贴图");
             m_MaterialEditor.ShaderProperty(MainSpeed, "主贴图流动速度");
+            m_MaterialEditor.ShaderProperty(MainClampEnabled, "开启贴图Clamp");
+            m_MaterialEditor.ShaderProperty(MainClamp, "主贴图Clamp");
             m_MaterialEditor.ShaderProperty(Cutoff, "透明度裁切");
             m_MaterialEditor.ShaderProperty(SoftParticlesEnabled, "开启软粒子");
             if (material.GetFloat("_SoftParticlesEnabled") == 1)

@@ -3,8 +3,12 @@ Shader "KIIF/Effect/Distort"
     Properties
     {
         [MainColor][HDR] _BaseColor("Color", Color) = (1,1,1,1)
+        _Brighten("提亮", Range(0, 5)) = 1
+        [Toggle] _SelfMask("自我遮罩", Float) = 0
         [MainTexture] _BaseMap("Albedo", 2D) = "white" {}
         _MainSpeed("主贴图流动速度", Vector) = (0,0,0,0)
+        [Toggle] _MainClampEnabled("__mainclamp", Float) = 0.0
+        _MainClamp("主贴图Clamp", Vector) = (0,0,1,1)
         _Cutoff("Alpha Cutoff", Range(0.0, 1.0)) = 0
         [Toggle] _SoftParticlesEnabled("__softparticlesenabled", Float) = 0.0
         _SoftParticle("软粒子", Range(0, 10)) = 1
@@ -22,7 +26,7 @@ Shader "KIIF/Effect/Distort"
         _DissolveSpeed("溶解流动速度", Float) = 0
         _Dissolve("溶解进度", Range(0.0, 1.0)) = 0
         _DissolveMap("溶解贴图", 2D) = "white" {}
-        _DissolveSharpen("溶解硬度(最小值为1)", Range(1, 20)) = 0
+        _DissolveSharpen("溶解硬度(最小值为1)", Range(1, 20)) = 1
         [HDR] _DissolveSideColor("溶解边缘颜色", Color) = (0,0,0,0)
         _DissolveSideWidth("溶解边缘宽度", Float) = 0
         
@@ -91,6 +95,7 @@ Shader "KIIF/Effect/Distort"
                 float4 positionOS               : POSITION;
                 half4 color                     : COLOR;
                 float4 texcoords                : TEXCOORD0;
+                float4 texcoord1                : TEXCOORD1;
                 UNITY_VERTEX_INPUT_INSTANCE_ID
             };
 
@@ -98,6 +103,7 @@ Shader "KIIF/Effect/Distort"
             {
                 float4 clipPos                  : SV_POSITION;
                 float4 texcoord                 : TEXCOORD0;
+                float4 texcoord1                : TEXCOORD1;
                 half4 color                     : COLOR;
                 float3 positionWS               : TEXCOORD5;
 
@@ -111,7 +117,11 @@ Shader "KIIF/Effect/Distort"
 
             CBUFFER_START(UnityPerMaterial)
             float4 _BaseMap_ST;
+            float _Brighten;
+            float _SelfMask;
             float2 _MainSpeed;
+            float _MainClampEnabled;
+            float4 _MainClamp;
             half4 _BaseColor;
             half _Cutoff;
 
@@ -170,6 +180,7 @@ Shader "KIIF/Effect/Distort"
                 // 多套贴图，在PS中变换UV
                 // output.texcoord = TRANSFORM_TEX(input.texcoord, _BaseMap);
                 output.texcoord = input.texcoords;
+                output.texcoord1 = input.texcoord1;
 
                 output.positionWS = vertexInput.positionWS;
                 #if defined(_SOFTPARTICLES_ON) || defined(_FADING_ON) || defined(_DISTORTION_ON)
@@ -195,9 +206,16 @@ Shader "KIIF/Effect/Distort"
                 twist *= _TwistStrength;
 
                 // 基础功能
-                float2 baseUV = TRANSFORM_TEX(uv, _BaseMap) + twist;
+                float2 baseUV = uv + input.texcoord1.xy;
+                baseUV = max(baseUV, _MainClamp.xy);
+                baseUV = min(baseUV, _MainClamp.zw);
+                baseUV = lerp(uv, baseUV, _MainClampEnabled);       //是否开启UV Clamp
+                baseUV = TRANSFORM_TEX(baseUV, _BaseMap);
+                baseUV += twist;
                 baseUV += _Time.y * _MainSpeed.xy;
                 half4 color = SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, baseUV);
+                color.a *= lerp(1, color.r, _SelfMask);
+                color.rgb = pow(color.rgb, _Brighten) * _Brighten * _Brighten;  //提亮贴图的颜色
                 color *= _BaseColor * vertexColor;
                 clip(color.a - _Cutoff);
 
