@@ -157,7 +157,7 @@
                 color.rgb += GIcolor;
                 
                 #ifdef _ADDITIONAL_LIGHTS
-                GetAdditionalLightColor(brdfData, pbrData);
+                color.rgb += GetAdditionalLightColor(brdfData, pbrData);
                 #endif
                 
                 // -------------------------------------
