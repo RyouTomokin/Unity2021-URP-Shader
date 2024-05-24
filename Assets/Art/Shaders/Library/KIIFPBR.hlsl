@@ -175,6 +175,20 @@ inline half4 GetDirectLightColor(Light mainLight, BRDFData brdfData, PBRData pbr
     return color;
 }
 
+inline half3 GetAdditionalLightColor(BRDFData brdfData, PBRData pbrData)
+{
+    half3 additionColor = half3(0,0,0);
+    uint pixelLightCount = GetAdditionalLightsCount();
+    for (uint lightIndex = 0u; lightIndex < pixelLightCount; ++lightIndex)
+    {
+        Light light = GetAdditionalLight(lightIndex, pbrData.positionWS);
+        //只获取实时点光源阴影
+        light.shadowAttenuation = AdditionalLightRealtimeShadow(lightIndex, pbrData.positionWS, light.direction);
+        additionColor += LightingPhysicallyBased(brdfData, light, pbrData.normalWS, pbrData.viewDirectionWS);
+    }           
+    return additionColor;
+}
+
 inline half3 GetGIColor(Varyings input, Light mainLight, BRDFData brdfData, PBRData pbrData)
 {
     #if defined(LIGHTMAP_ON)

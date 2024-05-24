@@ -136,12 +136,7 @@
                 color.rgb += GIcolor;
                 
                 #ifdef _ADDITIONAL_LIGHTS
-                uint pixelLightCount = GetAdditionalLightsCount();
-                for (uint lightIndex = 0u; lightIndex < pixelLightCount; ++lightIndex)
-                {
-                    Light light = GetAdditionalLight(lightIndex, pbrData.positionWS);
-                    color.rgb += LightingPhysicallyBased(brdfData, light, pbrData.normalWS, pbrData.viewDirectionWS);
-                }
+                GetAdditionalLightColor(brdfData, pbrData);
                 #endif
                 // -------------------------------------
                 //材质云海
