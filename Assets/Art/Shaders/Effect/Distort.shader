@@ -94,7 +94,7 @@ Shader "KIIF/Effect/Distort"
             {
                 float4 positionOS               : POSITION;
                 half4 color                     : COLOR;
-                float4 texcoords                : TEXCOORD0;
+                float4 texcoord0                : TEXCOORD0;
                 float4 texcoord1                : TEXCOORD1;
                 UNITY_VERTEX_INPUT_INSTANCE_ID
             };
@@ -102,7 +102,7 @@ Shader "KIIF/Effect/Distort"
             struct VaryingsParticle
             {
                 float4 clipPos                  : SV_POSITION;
-                float4 texcoord                 : TEXCOORD0;
+                float4 texcoord0                : TEXCOORD0;
                 float4 texcoord1                : TEXCOORD1;
                 half4 color                     : COLOR;
                 float3 positionWS               : TEXCOORD5;
@@ -179,7 +179,7 @@ Shader "KIIF/Effect/Distort"
 
                 // 多套贴图，在PS中变换UV
                 // output.texcoord = TRANSFORM_TEX(input.texcoord, _BaseMap);
-                output.texcoord = input.texcoords;
+                output.texcoord0 = input.texcoord0;
                 output.texcoord1 = input.texcoord1;
 
                 output.positionWS = vertexInput.positionWS;
@@ -196,27 +196,32 @@ Shader "KIIF/Effect/Distort"
                 UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(input);
 
                 // 初始化粒子参数
-                float2 uv = input.texcoord.xy;
+                float2 uv = input.texcoord0.xy;
                 float4 vertexColor = input.color;
                 
                 // 扭曲
                 half2 twistUV = uv * _TwistMap_ST.xy + _TwistSpeed * _TwistMap_ST.zw * _Time.y;
                 half2 twist = SAMPLE_TEXTURE2D(_TwistMap, sampler_TwistMap, twistUV).rg;
                 // twist = (twist - 0.5) * 2;
-                twist *= _TwistStrength;
+                twist *= _TwistStrength * input.texcoord0.w;
 
                 // 基础功能
                 float2 baseUV = uv + input.texcoord1.xy;
-                baseUV = max(baseUV, _MainClamp.xy);
+                baseUV += twist;                                        //把扭曲提前
+                half2 clampAlpha = step(_MainClamp.xy, baseUV.xy);      //UV硬切
+                clampAlpha *= step(baseUV.xy, _MainClamp.zw);
+                baseUV = max(baseUV, _MainClamp.xy);                    //UV限制
                 baseUV = min(baseUV, _MainClamp.zw);
-                baseUV = lerp(uv, baseUV, _MainClampEnabled);       //是否开启UV Clamp
+                baseUV = lerp(uv, baseUV, _MainClampEnabled);           //是否开启UV Clamp
+                clampAlpha = lerp(1, clampAlpha, _MainClampEnabled);    //是否开启UV Clamp
                 baseUV = TRANSFORM_TEX(baseUV, _BaseMap);
-                baseUV += twist;
                 baseUV += _Time.y * _MainSpeed.xy;
                 half4 color = SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, baseUV);
                 color.a *= lerp(1, color.r, _SelfMask);
                 color.rgb = pow(color.rgb, _Brighten) * _Brighten * _Brighten;  //提亮贴图的颜色
                 color *= _BaseColor * vertexColor;
+
+                color.a *= clampAlpha.x * clampAlpha.y;
                 clip(color.a - _Cutoff);
 
                 // 溶解
@@ -226,7 +231,7 @@ Shader "KIIF/Effect/Distort"
                 // dissolveMask = saturate((dissolveMask - 0.5) * dissolveMaskSoft + dissolveMaskRange);
 
                 half2 dissolveUV = uv * _DissolveMap_ST.xy + _DissolveSpeed * _DissolveMap_ST.zw * _Time.y + twist;
-                half dissolveFactor = input.texcoord.z + _Dissolve;
+                half dissolveFactor = input.texcoord0.z + _Dissolve;
                 // half dissolveFactor = _Dissolve;
                 half dissolve = SAMPLE_TEXTURE2D(_DissolveMap, sampler_DissolveMap, dissolveUV).r;
                 // dissolve = (dissolve + dissolveMask - 1);                    //溶解遮罩dissolve-(1-mask)
