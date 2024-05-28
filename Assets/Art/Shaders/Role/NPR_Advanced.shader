@@ -258,6 +258,7 @@
                 float4 shadowCoord = TransformWorldToShadowCoord(pbrData.positionWS); //主光计算阴影
                 Light mainLight = GetMainLight(shadowCoord);
                 float mainLightIntensity = Max3(mainLight.color.r, mainLight.color.g, mainLight.color.b);
+                mainLight.color *= rcp(max(mainLightIntensity - 1, 0) + 1);
                 mainLightIntensity = min(mainLightIntensity, 1.2);
                 float GIIntensity = Desaturate(_GlossyEnvironmentColor.rgb, 0.0).r;
                 // float LightIntensity = max(mainLightIntensity, GIIntensity);
@@ -282,7 +283,7 @@
                 half shadowLayer = saturate(lerp(_Shadow, _MaxLight, selfShadow));
                 half3 NPRColor2 = GIcolor * shadowLayer;
                 
-                NPRColor = NPRColor * colorLayering * LightIntensity + NPRColor2;
+                NPRColor = NPRColor * colorLayering * mainLight.color * LightIntensity + NPRColor2;
                 
                 half blendFactor = lerp(0.2, 1, saturate(GIIntensity));
                 color.rgb = lerp(NPRColor, color.rgb, pbrData.metallic * blendFactor);
@@ -300,9 +301,14 @@
                 half3 rimColor = lerp(NPRColor, _RimColor.rgb, _RimLerp);
                 
                 color.rgb += NdotV * rimColor * _RimIntensity;
-                
+
                 #ifdef _ADDITIONAL_LIGHTS
-                color.rgb += GetAdditionalLightColor(brdfData, pbrData);
+                half3 additionColor = GetAdditionalLightColor(brdfData, pbrData);
+                float additionIntensity = Max3(additionColor.r, additionColor.g, additionColor.b);
+                half3 additionNPRColor = additionColor * rcp(max(additionIntensity - 1, 0) + 1);
+                additionIntensity = min(additionIntensity, 1 - GIIntensity);
+                additionNPRColor *= additionIntensity;
+                color.rgb += lerp(additionNPRColor, additionColor, pbrData.metallic * blendFactor);
                 #endif
                 
                 // -------------------------------------

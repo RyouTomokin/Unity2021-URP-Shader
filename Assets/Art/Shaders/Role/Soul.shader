@@ -2,7 +2,7 @@ Shader "KIIF/Soul"
 {
     Properties
     {
-    	[MainColor][HDR] _BaseColor("Color", Color) = (1,1,1,1)
+    	[MainColor][HDR] _BaseColor("Color", Color) = (0.5, 0.5, 0.5,1)
         [MainTexture] _BaseMap("Albedo", 2D) = "white" {}
     	_ColorIntensity("ColorIntensity", Float) = 1
     	
@@ -148,7 +148,7 @@ Shader "KIIF/Soul"
 				float2 uv = IN.uv.xy;
 				float2 baseUV = TRANSFORM_TEX(uv, _BaseMap);
                 half4 color = SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, baseUV);
-				color *= 0.5;
+				color *= _BaseColor;
 
 				// Screen Blend
 				color = lerp(color, 1 - (1 - soulColor) * (1 - color), 0.5) * _ColorIntensity;
