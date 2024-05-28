@@ -143,9 +143,9 @@
                 half selfShadow = 1;
                 #ifdef _CONTROLMAP
                 half4 Control = SAMPLE_TEXTURE2D(_ControlMap, sampler_ControlMap, input.uv);
-                pbrData.smoothness = _Smoothness;
                 specularArea = Control.r;
                 pbrData.metallic = Control.b * _Metallic;
+                pbrData.smoothness = lerp(0, _Smoothness, step(0.2, pbrData.metallic));
                 pbrData.occlusion = 1;
                 selfShadow = Control.g;
                 #endif
@@ -173,15 +173,6 @@
                 half3 GIcolor = GetGIColor(input, mainLight, brdfData, pbrData);
                 
                 color.rgb += GIcolor;
-
-                #ifdef _ADDITIONAL_LIGHTS
-                uint pixelLightCount = GetAdditionalLightsCount();
-                for (uint lightIndex = 0u; lightIndex < pixelLightCount; ++lightIndex)
-                {
-                    Light light = GetAdditionalLight(lightIndex, pbrData.positionWS);
-                    color.rgb += LightingPhysicallyBased(brdfData, light, pbrData.normalWS, pbrData.viewDirectionWS);
-                }
-                #endif
 
                 // -------------------------------------
                 //非金属部分NPR光照
@@ -213,6 +204,11 @@
                 half3 rimColor = lerp(NPRColor, _RimColor.rgb, _RimLerp);
                 
                 color.rgb += NdotV * rimColor * _RimIntensity;
+
+                #ifdef _ADDITIONAL_LIGHTS
+                color.rgb += GetAdditionalLightColor(brdfData, pbrData);
+                #endif
+                
                 // -------------------------------------
                 #ifdef _EMISSIONALBEDO_ON
                 color.rgb += pbrData.albedo * pbrData.emissionColor;

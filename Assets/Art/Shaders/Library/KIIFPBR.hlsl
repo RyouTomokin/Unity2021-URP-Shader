@@ -179,9 +179,15 @@ inline half3 GetAdditionalLightColor(BRDFData brdfData, PBRData pbrData)
 {
     half3 additionColor = half3(0,0,0);
     uint pixelLightCount = GetAdditionalLightsCount();
-    for (uint lightIndex = 0u; lightIndex < pixelLightCount; ++lightIndex)
+    for (uint i = 0u; i < pixelLightCount; ++i)
     {
-        Light light = GetAdditionalLight(lightIndex, pbrData.positionWS);
+        // Light light = GetAdditionalLight(lightIndex, pbrData.positionWS, 1);
+        #if USE_CLUSTERED_LIGHTING
+        int lightIndex = i;
+        #else
+        int lightIndex = GetPerObjectLightIndex(i);
+        Light light = GetAdditionalPerObjectLight(lightIndex, pbrData.positionWS);
+        #endif
         //只获取实时点光源阴影
         light.shadowAttenuation = AdditionalLightRealtimeShadow(lightIndex, pbrData.positionWS, light.direction);
         additionColor += LightingPhysicallyBased(brdfData, light, pbrData.normalWS, pbrData.viewDirectionWS);
