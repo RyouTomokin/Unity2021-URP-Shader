@@ -22,7 +22,7 @@ Shader "KIIF/Effect/Distort"
         _MaskTwistStrength("遮罩图被扭曲的强度", Range(0 , 1)) = 0
         _MaskSoft("遮罩图软硬", Range( 1 , 10)) = 1
         
-        _DissolveMaskMap("溶解的遮罩贴图", 2D) = "white" {}
+        _DissolveMaskMap("溶解的遮罩贴图", 2D) = "black" {}
         _DissolveSpeed("溶解流动速度", Float) = 0
         _Dissolve("溶解进度", Range(0.0, 1.0)) = 0
         _DissolveMap("溶解贴图", 2D) = "white" {}
@@ -235,10 +235,11 @@ Shader "KIIF/Effect/Distort"
                 // half dissolveFactor = _Dissolve;
                 half dissolve = SAMPLE_TEXTURE2D(_DissolveMap, sampler_DissolveMap, dissolveUV).r;
                 // dissolve = (dissolve + dissolveMask - 1);                    //溶解遮罩dissolve-(1-mask)
-                dissolve = saturate(dissolve + dissolveMask - dissolveFactor);  //溶解遮罩dissolve-(1-mask)
+                dissolve = saturate(dissolve + (1 - dissolveFactor) * dissolveMask);
                 dissolve = dissolve + 1 - (2 * dissolveFactor);                 //溶解程度dissolve-2(factor-0.5)
                 half dissolveSide = step(0, dissolve) - step(_DissolveSideWidth, dissolve);
                 dissolve = (dissolve - 0.5) * _DissolveSharpen + 0.5;           //溶解边缘锐化
+                dissolve = lerp(dissolve, step(0.5, dissolve), step(19.9, _DissolveSharpen));   //硬度过大直接硬溶解
                 dissolve = saturate(dissolve);
 
                 half3 dissolveSideColor = dissolveSide * _DissolveSideColor.rgb;
