@@ -108,12 +108,13 @@
 			{
 				Varyings output = (Varyings)0;
 
-				output.uv = input.texcoord;
+				output.uv = TRANSFORM_TEX(input.texcoord, _BaseMap);
 				
 				VertexPositionInputs vertexInput = GetVertexPositionInputs(input.positionOS.xyz);
 				VertexNormalInputs normalInput = GetVertexNormalInputs(input.normalOS, input.tangentOS);
 				
 				output.positionCS = vertexInput.positionCS;
+				output.positionWS = vertexInput.positionWS;
 				output.normalWS = normalInput.normalWS;
 				output.tangentWS = normalInput.tangentWS;
 				output.bitangentWS = normalInput.bitangentWS;
@@ -157,15 +158,16 @@
             	float3 planePos = offsetLen * cameraDir + worldPos;
             	// return half4(frac(planePos.xz), 0, 1);
 
-            	float2 uv = TRANSFORM_TEX(planePos.xz, _BaseMap);
+            	float2 uv = TRANSFORM_TEX(planePos.xz, _BaseMap) / _PlaneHeight;
             	float2 fogUV0 = uv + _Time * _FogSpeed.xy;
             	fogUV0 *= _FogScale;
             	float2 fogUV1 = uv + _Time * _FogSpeed.zw;
             	fogUV1 *= _FogScale;
             	
             	half3x3 TangentToWorld = half3x3(input.tangentWS.xyz, input.bitangentWS.xyz, input.normalWS.xyz);
-            	half3 cameraDirection =  -1 * mul((float3x3)UNITY_MATRIX_M, transpose(mul(UNITY_MATRIX_I_M, UNITY_MATRIX_I_V)) [2].xyz);
-            	fogUV1 = BumpOffset(TangentToWorld, cameraDirection, fogUV1, _BumpHeight);
+            	// half3 cameraDirection =  -1 * mul((float3x3)UNITY_MATRIX_M, transpose(mul(UNITY_MATRIX_I_M, UNITY_MATRIX_I_V)) [2].xyz);
+            	half3 cameraVector = normalize(cameraPos - input.positionWS);
+            	fogUV1 = BumpOffset(TangentToWorld, cameraVector, fogUV1, _BumpHeight);
 
             	// 采样纹理图
             	half4 fogTex0 = SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, fogUV0);
