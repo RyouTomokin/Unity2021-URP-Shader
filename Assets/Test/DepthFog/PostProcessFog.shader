@@ -5,7 +5,7 @@
     	[MainColor][HDR] _BaseColor("Color", Color) = (1,1,1,1)
     	[MainTexture] _BaseMap("雾纹理", 2D) = "white" {}
         
-        _FogDistance("雾过渡", Float) = 1000
+        _FogDistance("雾深度比例", Float) = 1
     	
         _FogStartDistance("雾开始距离", Float) = 0
         _FogFarDistance("雾结束距离", Float) = 10
@@ -13,7 +13,7 @@
         _PlaneHeight("平面高度", Float) = 0
     	_FogScale("雾缩放大小", Float) = 1
     	_FogSpeed("雾流动速度", Vector) = (0,0,0,0)
-        _BumpHeight("视差高度", Float) = 0
+        _BumpHeight("视差高度", Float) = 0.5
         
         [Space(20)]
         [Header(Stencil)]
@@ -140,7 +140,7 @@
                 #endif
 
             	// 重映射场景深度
-            	float depthRemap = max(depth * _FogDistance - _FogStartDistance, 0);
+            	float depthRemap = max((depth * 1000 - _FogStartDistance) * _FogDistance , 0);
             	depthRemap = smoothstep(1, 0, depthRemap);
             	// return half4(depthRemap * half3(1,1,1), 1);
 
