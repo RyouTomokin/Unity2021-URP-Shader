@@ -159,9 +159,9 @@
             	// return half4(frac(planePos.xz), 0, 1);
 
             	float2 uv = TRANSFORM_TEX(planePos.xz, _BaseMap) / _PlaneHeight;
-            	float2 fogUV0 = uv + _Time.y * _FogSpeed.xy;
+            	float2 fogUV0 = uv + _Time.x * _FogSpeed.xy;
             	fogUV0 *= _FogScale;
-            	float2 fogUV1 = uv + _Time.y * _FogSpeed.zw;
+            	float2 fogUV1 = uv + _Time.x * _FogSpeed.zw;
             	fogUV1 *= _FogScale;
             	
             	half3x3 TangentToWorld = half3x3(input.tangentWS.xyz, input.bitangentWS.xyz, input.normalWS.xyz);
@@ -182,7 +182,7 @@
             	density += depthRemap;
             	density = saturate(density);
 				// 雾最远的裁切距离
-            	density *= smoothstep(_FogFarDistance, 0, length(offsetLen));
+            	density *= smoothstep(_FogFarDistance, 0, offsetLen.y);
             	// 只显示在下方的雾
 				density *= step(cameraDir.y, 0);
 
