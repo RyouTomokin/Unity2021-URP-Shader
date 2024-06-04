@@ -111,7 +111,7 @@
 				output.uv = TRANSFORM_TEX(input.texcoord, _BaseMap);
 				
 				VertexPositionInputs vertexInput = GetVertexPositionInputs(input.positionOS.xyz);
-				VertexNormalInputs normalInput = GetVertexNormalInputs(input.normalOS, input.tangentOS);
+				VertexNormalInputs normalInput = GetVertexNormalInputs(input.normalOS.xyz, input.tangentOS);
 				
 				output.positionCS = vertexInput.positionCS;
 				output.positionWS = vertexInput.positionWS;
@@ -148,7 +148,7 @@
                 // 重建世界空间位置。
                 float3 worldPos = ComputeWorldSpacePosition(screenUV, depth, UNITY_MATRIX_I_VP);
 
-            	float3 cameraPos = UNITY_MATRIX_I_V._14_24_34;
+            	float3 cameraPos = _WorldSpaceCameraPos;            	
 
             	float fogPlaneHeight = cameraPos.y - _PlaneHeight;
 
@@ -159,9 +159,9 @@
             	// return half4(frac(planePos.xz), 0, 1);
 
             	float2 uv = TRANSFORM_TEX(planePos.xz, _BaseMap) / _PlaneHeight;
-            	float2 fogUV0 = uv + _Time * _FogSpeed.xy;
+            	float2 fogUV0 = uv + _Time.y * _FogSpeed.xy;
             	fogUV0 *= _FogScale;
-            	float2 fogUV1 = uv + _Time * _FogSpeed.zw;
+            	float2 fogUV1 = uv + _Time.y * _FogSpeed.zw;
             	fogUV1 *= _FogScale;
             	
             	half3x3 TangentToWorld = half3x3(input.tangentWS.xyz, input.bitangentWS.xyz, input.normalWS.xyz);
@@ -182,8 +182,9 @@
             	density += depthRemap;
             	density = saturate(density);
 				// 雾最远的裁切距离
-            	density *= smoothstep(_FogFarDistance, 0, offsetLen);
-
+            	density *= smoothstep(_FogFarDistance, 0, length(offsetLen));
+            	// 只显示在下方的雾
+				density *= step(cameraDir.y, 0);
 
             	half4 color = _BaseColor;
             	color.a *= density;
