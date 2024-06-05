@@ -1,0 +1,66 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!21 &2100000
+Material:
+  serializedVersion: 8
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: KIIF_GodRay
+  m_Shader: {fileID: 4800000, guid: 63e05e734265ddd4ea988455f23ceb0b, type: 3}
+  m_ValidKeywords:
+  - _SOFTPARTICLES_ON
+  m_InvalidKeywords: []
+  m_LightmapFlags: 4
+  m_EnableInstancingVariants: 1
+  m_DoubleSidedGI: 0
+  m_CustomRenderQueue: -1
+  stringTagMap: {}
+  disabledShaderPasses: []
+  m_SavedProperties:
+    serializedVersion: 3
+    m_TexEnvs:
+    - _BaseMap:
+        m_Texture: {fileID: 2800000, guid: c6e5b359d9216d940937fc326d2b7ccf, type: 3}
+        m_Scale: {x: 1.2, y: 0.01}
+        m_Offset: {x: 0.02, y: 0.05}
+    - _BumpMap:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _MaskMap:
+        m_Texture: {fileID: 2800000, guid: 32493fb93d2a96d4a8ae94ae1548c598, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _SMAEMap:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    m_Ints: []
+    m_Floats:
+    - _AlphaClip: 0
+    - _AlphaTest: 0
+    - _BumpScale: 1
+    - _Cull: 2
+    - _Cutoff: 0
+    - _DepthWrite: 0
+    - _DoubleSide: 0
+    - _EmissionStrength: 0
+    - _Length: 49.9
+    - _Metallic: 0
+    - _OcclusionStrength: 1
+    - _RefValue: 0
+    - _Smoothness: 0.5
+    - _SoftParticle: 1.05
+    - _SoftParticlesEnabled: 1
+    - _SpotMode: 1
+    - _StencilComp: 8
+    - _StencilPass: 0
+    - _Surface: 0
+    - _Width: 5.8
+    - _ZWrite: 0
+    m_Colors:
+    - _BaseColor: {r: 0.9716981, g: 0.90508485, b: 0.6386317, a: 0.8}
+    - _EmissionColor: {r: 0, g: 0, b: 0, a: 1}
+  m_BuildTextureStacks: []

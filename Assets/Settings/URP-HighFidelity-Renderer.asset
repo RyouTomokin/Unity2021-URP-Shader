@@ -32,7 +32,7 @@ MonoBehaviour:
   m_Active: 1
   settings:
     renderPassEvent: 450
-    shader: {fileID: 4800000, guid: fe0ca9656c2043345bdbe4fcfc5701c6, type: 3}
+    shader: {fileID: 4800000, guid: 0f4aec6767e300b418f5752d05a1e2f3, type: 3}
 --- !u!114 &-1878332245247344467
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -50,7 +50,7 @@ MonoBehaviour:
   m_Settings:
     Downsample: 0
     AfterOpaque: 0
-    Source: 1
+    Source: 0
     NormalSamples: 1
     Intensity: 0.5
     DirectLightingStrength: 0.25
@@ -76,7 +76,8 @@ MonoBehaviour:
   - {fileID: -5881221032323236557}
   - {fileID: -3867463416408842293}
   - {fileID: 1770478741548311423}
-  m_RendererFeatureMap: adc0de57c6d2eee5333dd192a1b461aecbdf2173830254ca7f235ef808019218
+  - {fileID: 8416141971572664448}
+  m_RendererFeatureMap: adc0de57c6d2eee5333dd192a1b461aecbdf2173830254ca7f235ef8080192188028d8528824cc74
   m_UseNativeRenderPass: 0
   postProcessData: {fileID: 11400000, guid: 41439944d30ece34e96484bdb6645b55, type: 2}
   xrSystemData: {fileID: 11400000, guid: 60e1133243b97e347b653163a8c01b64, type: 2}
@@ -129,7 +130,23 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f221d144fc773b54c99e634d5624336d, type: 3}
   m_Name: DesaturateStencil
   m_EditorClassIdentifier: 
-  m_Active: 1
+  m_Active: 0
   settings:
     renderPassEvent: 400
     shader: {fileID: 4800000, guid: 99da457447510e7498b964c61b480930, type: 3}
+--- !u!114 &8416141971572664448
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 335e4b6dba5a4404791c9d9b0b23afa3, type: 3}
+  m_Name: PostprocessFog
+  m_EditorClassIdentifier: 
+  m_Active: 0
+  settings:
+    renderPassEvent: 500
+    materia: {fileID: 2100000, guid: 28b272c4700bc8e4f9a4bb9d3be98ffa, type: 2}
