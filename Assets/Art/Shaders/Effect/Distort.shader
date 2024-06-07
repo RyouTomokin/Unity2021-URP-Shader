@@ -207,12 +207,13 @@ Shader "KIIF/Effect/Distort"
 
                 // 基础功能
                 float2 baseUV = uv + input.texcoord1.xy;
-                baseUV += twist;                                        //把扭曲提前
+                baseUV += twist;                                            //把扭曲提前
+                const float2 baseUVTwisted = baseUV;
                 // half2 clampAlpha = step(_MainClamp.xy, baseUV.xy);      //UV硬切
                 // clampAlpha *= step(baseUV.xy, _MainClamp.zw);
-                baseUV = max(baseUV, _MainClamp.xy);                    //UV限制
+                baseUV = max(baseUV, _MainClamp.xy);                        //UV限制
                 baseUV = min(baseUV, _MainClamp.zw);
-                baseUV = lerp(uv, baseUV, _MainClampEnabled);           //是否开启UV Clamp
+                baseUV = lerp(baseUVTwisted, baseUV, _MainClampEnabled);    //是否开启UV Clamp
                 // clampAlpha = lerp(1, clampAlpha, _MainClampEnabled);    //是否开启UV Clamp
                 baseUV = TRANSFORM_TEX(baseUV, _BaseMap);
                 baseUV += _Time.y * _MainSpeed.xy;
