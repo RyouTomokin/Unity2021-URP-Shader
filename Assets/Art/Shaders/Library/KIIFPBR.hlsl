@@ -195,6 +195,32 @@ inline half3 GetAdditionalLightColor(BRDFData brdfData, PBRData pbrData)
     return additionColor;
 }
 
+inline half3 GetAdditionalLightColorNPR(BRDFData brdfData, PBRData pbrData)
+{
+    half3 additionColor = half3(0,0,0);
+    uint pixelLightCount = GetAdditionalLightsCount();
+    for (uint i = 0u; i < pixelLightCount; ++i)
+    {
+        // Light light = GetAdditionalLight(lightIndex, pbrData.positionWS, 1);
+        #if USE_CLUSTERED_LIGHTING
+        int lightIndex = i;
+        #else
+        int lightIndex = GetPerObjectLightIndex(i);
+        Light light = GetAdditionalPerObjectLight(lightIndex, pbrData.positionWS);
+        //防止过曝对灯光强度进行限制
+        //现在使用颜色为lerp的value，若使用颜色强度更能保留灯光的饱和度
+        half3 lightColor = light.color;
+        half3 additionNPRColor = lerp(lightColor, lightColor*0.5, smoothstep(2,10,lightColor));
+        additionNPRColor = min(4.6, additionNPRColor);
+        light.color = additionNPRColor;
+        #endif
+        //只获取实时点光源阴影
+        light.shadowAttenuation = AdditionalLightRealtimeShadow(lightIndex, pbrData.positionWS, light.direction);
+        additionColor += LightingPhysicallyBased(brdfData, light, pbrData.normalWS, pbrData.viewDirectionWS);
+    }           
+    return additionColor;
+}
+
 inline half3 GetGIColor(Varyings input, Light mainLight, BRDFData brdfData, PBRData pbrData)
 {
     #if defined(LIGHTMAP_ON)
@@ -206,6 +232,23 @@ inline half3 GetGIColor(Varyings input, Light mainLight, BRDFData brdfData, PBRD
     // bakedGI = SubtractDirectMainLightFromLightmap(mainLight, pbrData.normalWS, bakedGI);    //MixRealtimeAndBakedGI
 
     half3 GIcolor = GlobalIllumination(brdfData, bakedGI, pbrData.occlusion, pbrData.normalWS, pbrData.viewDirectionWS);
+
+    return GIcolor;
+}
+
+inline half3 GetGIColorNPR(Varyings input, Light mainLight, BRDFData brdfData, PBRData pbrData)
+{
+    #if defined(LIGHTMAP_ON)
+    half3 bakedGI = SAMPLE_GI(input.lightmapUV, input.lightmapUV, pbrData.normalWS);
+    #else
+    half3 bakedGI = SAMPLE_GI(input.lightmapUV, input.vertexSH, pbrData.normalWS);
+    #endif
+    // #if defined(LIGHTMAP_ON) && defined(_MIXED_LIGHTING_SUBTRACTIVE)
+    // bakedGI = SubtractDirectMainLightFromLightmap(mainLight, pbrData.normalWS, bakedGI);    //MixRealtimeAndBakedGI
+
+    half3 GIcolor = GlobalIllumination(brdfData, bakedGI, pbrData.occlusion, pbrData.normalWS, pbrData.viewDirectionWS);
+    //控制角色受环境光色相影响的程度
+    GIcolor = lerp(brdfData.diffuse * Desaturate(bakedGI,0.0), GIcolor, 0.3);
 
     return GIcolor;
 }

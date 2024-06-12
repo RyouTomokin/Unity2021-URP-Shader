@@ -267,7 +267,7 @@
                 // float LightIntensity = mainLightIntensity * lightFact + GIIntensity * (1-lightFact);
                 
                 half4 color = GetDirectLightColor(mainLight, brdfData, pbrData);
-                half3 GIcolor = GetGIColor(input, mainLight, brdfData, pbrData);
+                half3 GIcolor = GetGIColorNPR(input, mainLight, brdfData, pbrData);
                 
                 color.rgb += GIcolor;
 
@@ -303,12 +303,8 @@
                 color.rgb += NdotV * rimColor * _RimIntensity;
 
                 #ifdef _ADDITIONAL_LIGHTS
-                half3 additionColor = GetAdditionalLightColor(brdfData, pbrData);
-                float additionIntensity = Max3(additionColor.r, additionColor.g, additionColor.b);
-                half3 additionNPRColor = additionColor * rcp(max(additionIntensity - 1, 0) + 1);
-                additionIntensity = min(additionIntensity, 1 - GIIntensity);
-                additionNPRColor *= additionIntensity;
-                color.rgb += lerp(additionNPRColor, additionColor, pbrData.metallic * blendFactor);
+                half3 additionColor = GetAdditionalLightColorNPR(brdfData, pbrData);
+                color.rgb += additionColor;
                 #endif
                 
                 // -------------------------------------
