@@ -35,7 +35,7 @@ struct Varyings
     #if defined(REQUIRES_VERTEX_SHADOW_COORD_INTERPOLATOR)
     float4 shadowCoord              : TEXCOORD7;
     #endif
-    #ifdef _SCREENDISSOLVE_ON
+    #ifdef _SCREENPOSITION_ON
     float4 screenPos                : TEXCOORD8;
     #endif
     
@@ -99,7 +99,7 @@ Varyings vert(Attributes input)
 
     output.positionCS = vertexInput.positionCS;
 
-    #ifdef _SCREENDISSOLVE_ON
+    #ifdef _SCREENPOSITION_ON
     // output.screenPos = ComputeScreenPos(output.positionCS)/output.positionCS.w; 
     output.screenPos = vertexInput.positionNDC/output.positionCS.w; 
     #endif
