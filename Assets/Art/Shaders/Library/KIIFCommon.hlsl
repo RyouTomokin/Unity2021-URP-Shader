@@ -133,6 +133,10 @@ half CheapContrast(half In, half Contrast)
     return clamp(temp, 0.0f, 1.0f);
 }
 
+//BumpOffset配套参数的计算
+// half3x3 TangentToWorld = half3x3(input.tangentWS.xyz, input.bitangentWS.xyz, input.normalWS.xyz);
+// // half3 cameraDirection =  -1 * mul((float3x3)UNITY_MATRIX_M, transpose(mul(UNITY_MATRIX_I_M, UNITY_MATRIX_I_V)) [2].xyz);
+// half3 cameraVector = normalize(_WorldSpaceCameraPos - input.positionWS);
 /**
  * \brief UV随着视角偏移，模拟深度
  * \param tangentToWorld 切线空间转世界空间的矩阵
