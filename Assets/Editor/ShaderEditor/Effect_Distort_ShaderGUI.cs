@@ -40,7 +40,9 @@ public class Effect_Distort_ShaderGUI : ShaderGUI
     MaterialProperty MaskTwistStrength = null;
     MaterialProperty MaskSoft = null;
     //溶解
+    MaterialProperty DissolveMode = null;
     MaterialProperty DissolveMaskMap = null;
+    MaterialProperty DissolveMaskSharpen = null;
     MaterialProperty DissolveSpeed = null;
     MaterialProperty Dissolve = null;
     MaterialProperty DissolveMap = null;
@@ -107,7 +109,9 @@ public class Effect_Distort_ShaderGUI : ShaderGUI
         MaskTwistStrength = FindProperty("_MaskTwistStrength", props);
         MaskSoft = FindProperty("_MaskSoft", props);
         
+        DissolveMode = FindProperty("_DissolveMode", props);
         DissolveMaskMap = FindProperty("_DissolveMaskMap", props);
+        DissolveMaskSharpen = FindProperty("_DissolveMaskSharpen", props);
         DissolveSpeed = FindProperty("_DissolveSpeed", props);
         Dissolve = FindProperty("_Dissolve", props);
         DissolveMap = FindProperty("_DissolveMap", props);
@@ -218,7 +222,9 @@ public class Effect_Distort_ShaderGUI : ShaderGUI
         _Dissolve_Foldout = Foldout(_Dissolve_Foldout, "溶解");
         if (_Dissolve_Foldout)
         {
+            m_MaterialEditor.ShaderProperty(DissolveMode, "轴向溶解模式");
             m_MaterialEditor.ShaderProperty(DissolveMaskMap, "溶解的遮罩贴图");
+            m_MaterialEditor.ShaderProperty(DissolveMaskSharpen, "溶解遮罩渐变范围");
             m_MaterialEditor.ShaderProperty(DissolveSpeed, "溶解流动速度");
             m_MaterialEditor.ShaderProperty(Dissolve, "溶解进度");
             m_MaterialEditor.ShaderProperty(DissolveMap, "溶解贴图");

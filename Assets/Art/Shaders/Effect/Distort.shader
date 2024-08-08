@@ -22,7 +22,9 @@ Shader "KIIF/Effect/Distort"
         _MaskTwistStrength("遮罩图被扭曲的强度", Range(0 , 1)) = 0
         _MaskSoft("遮罩图软硬", Range( 1 , 10)) = 1
         
+        _DissolveMode("轴向溶解模式", Range(0, 1)) = 0
         _DissolveMaskMap("溶解的遮罩贴图", 2D) = "black" {}
+        _DissolveMaskSharpen("溶解遮罩渐变范围", Range(0.0, 0.5)) = 0
         _DissolveSpeed("溶解流动速度", Float) = 0
         _Dissolve("溶解进度", Range(0.0, 1.0)) = 0
         _DissolveMap("溶解贴图", 2D) = "white" {}
@@ -41,7 +43,7 @@ Shader "KIIF/Effect/Distort"
     }
     SubShader
     {
-        Tags{"RenderType" = "Transparent" "RenderPipeline" = "UniversalPipeline" "IgnoreProjector" = "True" "Queue" = "Transparent"}
+        Tags{"RenderType" = "Transparent" "RenderPipeline" = "UniversalPipeline" "IgnoreProjector" = "True" "Queue" = "Transparent+50"}
         LOD 100
       
         // ------------------------------------------------------------------
@@ -133,7 +135,9 @@ Shader "KIIF/Effect/Distort"
             half _MaskTwistStrength;
             half _MaskSoft;
 
+            float _DissolveMode;
             float4 _DissolveMaskMap_ST;
+            half _DissolveMaskSharpen;
             float4 _DissolveMap_ST;
             half _Dissolve;
             half _DissolveSpeed;
@@ -232,13 +236,41 @@ Shader "KIIF/Effect/Distort"
                 // dissolveMask = saturate((dissolveMask - 0.5) * dissolveMaskSoft + dissolveMaskRange);
 
                 half2 dissolveUV = uv * _DissolveMap_ST.xy + _DissolveSpeed * _DissolveMap_ST.zw * _Time.y + twist;
-                half dissolveFactor = input.texcoord0.z + _Dissolve;
-                // half dissolveFactor = _Dissolve;
                 half dissolve = SAMPLE_TEXTURE2D(_DissolveMap, sampler_DissolveMap, dissolveUV).r;
-                // dissolve = (dissolve + dissolveMask - 1);                    //溶解遮罩dissolve-(1-mask)
-                dissolve = saturate(dissolve + (1 - dissolveFactor) * dissolveMask);
-                dissolve = dissolve + 1 - (2 * dissolveFactor);                 //溶解程度dissolve-2(factor-0.5)
+
+                half dissolveFactor = input.texcoord0.z + _Dissolve;
+
+                //溶解方案1
+                half dissolveMask_1 = lerp(0 - _DissolveMaskSharpen, 1 + _DissolveMaskSharpen, dissolveMask);
+                dissolveMask_1 -= lerp(-1, 1, dissolveFactor);
+                dissolveMask_1 = (dissolveMask_1 - _DissolveMaskSharpen) / (1 - 2 * _DissolveMaskSharpen);
+                dissolveMask_1 = saturate(dissolveMask_1);
+
+                half dissolve_1 = lerp(0, 1, dissolve);
+                dissolve_1 += dissolveMask_1;
+                dissolve_1 *= dissolveMask_1;
+
+                //溶解方案2
+                half dissolve_2 = saturate(dissolve + (1 - dissolveFactor) * dissolveMask);
+                // float dissolve_2 = saturate(lerp(dissolve,dissolveMask,dissolve) + (1 - dissolveFactor) * dissolveMask);
+                dissolve_2 -= lerp(-1, 1, dissolveFactor);
+
+                // //溶解方案3
+                // half dissolve_3 = dissolve;
+                // // dissolve_3 -= lerp(0, 1, dissolveFactor);
+                // half3 dissolveMask_3 = lerp(0, 1, dissolveMask);
+                // dissolve_3 += dissolveMask_3;
+                // dissolve_3 *= dissolveMask_3;
+                //
+                // //溶解方案Debug
+                // dissolve = uv.y>0.333 ? dissolve_2:dissolve_1;
+                // dissolve = uv.y>0.666 ? dissolve_3:dissolve;
+                
+                //溶解模式切换
+                dissolve = lerp(dissolve_2, dissolve_1, _DissolveMode);
+                
                 half dissolveSide = step(0, dissolve) - step(_DissolveSideWidth, dissolve);
+                // half dissolveSide = 1 - saturate(_DissolveSideWidth - dissolve)/_DissolveSideWidth - step(_DissolveSideWidth, dissolve);
                 dissolve = (dissolve - 0.5) * _DissolveSharpen + 0.5;           //溶解边缘锐化
                 dissolve = lerp(dissolve, step(0.5, dissolve), step(19.9, _DissolveSharpen));   //硬度过大直接硬溶解
                 dissolve = saturate(dissolve);
