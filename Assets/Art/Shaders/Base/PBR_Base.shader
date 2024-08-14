@@ -15,6 +15,10 @@
         _OcclusionStrength("AO", Range(0.0, 1.0)) = 1.0
         [HDR] _EmissionColor("自发光颜色", Color) = (0,0,0)
         _EmissionStrength("自发光强度", Range(0.0, 1.0)) = 0.0
+        _MetalEmissionStrength("金属自发光强度", Range(0.0, 1.0)) = 0.0
+        _FresnelEmissionStrength("边缘自发光强度", Range(0.0, 1.0)) = 0.0
+        _TextureEmissionStrength("贴图自发光强度", Range(0.0, 1.0)) = 0.0
+        _EmissionFlashSequence("自发光闪烁频率", Float) = 0.0
         
         [Space(20)]
         //[Header(ColorRamp)]
@@ -113,6 +117,11 @@
             #include "Assets/Art/Shaders/Library/KIIFPBR.hlsl"
             #include "Assets/Art/Shaders/Library/SnowFunction.hlsl"
             #include "Assets/Art/Shaders/Library/ColorRampFunction.hlsl"
+
+            float _MetalEmissionStrength;
+            float _FresnelEmissionStrength;
+            float _TextureEmissionStrength;
+            float _EmissionFlashSequence;
             
 
             half4 frag(Varyings input) : SV_Target
@@ -123,7 +132,7 @@
                 // -------------------------------------
                 //采样 初始化
 
-                PBRData pbrData;    //KIIF自定义结构体
+                PBRData pbrData = (PBRData)0;    //KIIF自定义结构体
                 PBRInitialize(input, pbrData);
 
                 // -------------------------------------
@@ -158,7 +167,21 @@
 
                 ColorRampFunction(pbrData.positionWS, color);
                 // -------------------------------------
-                color.rgb += pbrData.emissionColor;
+                //金属发光
+                half3 metalEmission = pbrData.albedo * pbrData.metallic * _MetalEmissionStrength;
+                //描边发光
+                half3 fresnelEmission = Pow4(1 - dot(pbrData.normalWS, pbrData.viewDirectionWS))
+                    * _FresnelEmissionStrength;
+                //贴图通道发光
+                //pbrData.emissionColor
+                //自发光
+                half3 allEmission = pbrData.emissionColor * _TextureEmissionStrength +
+                    (metalEmission + fresnelEmission) * _EmissionColor.rgb * _EmissionStrength;
+
+                allEmission *= _EmissionFlashSequence > 0 ?
+                (cos(_Time.y / _EmissionFlashSequence) + 1) * 0.5 : 1;
+                
+                color.rgb += allEmission;
                 // color.rgb = MixFog(color.rgb, fogCoord);
                 return color;
             }
