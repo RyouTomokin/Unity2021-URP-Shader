@@ -2,8 +2,11 @@
 {
     Properties
     {
+        [Toggle] _UseWorldPositionUV("使用世界坐标为纹理UV", Float) = 0
         [MainColor] _BaseColor("Color", Color) = (1,1,1,1)
-        [MainTexture] _BaseMap("Albedo", 2D) = "white" {}
+        [MainTexture] _BaseMap("焦散", 2D) = "white" {}
+        //基于原本缩放和速度的倍率
+        _SecondTiling("焦散第二层UV", Vector) = (1.2,1.2,0.2,0.2)
         _TwistStrength("TwistStrenght", Range(0, 1)) = 0.5
         _CausticsHeight("CausticsHeight", Range(-1, 1)) = 0
         _BumpScale("法线强度", Float) = 1.0
@@ -20,6 +23,9 @@
         [Header(Water)]
         _EdgeFade("EdgeFade", Range(0, 5)) = 1
         [PowerSlider(2)]_WaterDepthRange("WaterDepthRange", Range(0, 20)) = 2
+        [Toggle] _UseSideFoamMask("开启河流边缘泡沫", Float) = 1
+        _FoamBase("FoamBase", Range(0, 1)) = 0
+        //_EdgeColor.a可以控制泡沫的透明度
         _EdgeColor("EdgeColor", Color) = (1,1,1,1)
         _ColorBright("ColorBright", Color) = (0,0.5,0.6,0.2)
         _ColorDeep("ColorDeep", Color) = (0,0.2,0.3,1)
@@ -123,7 +129,9 @@
             };
             
             CBUFFER_START(UnityPerMaterial)
+            float _UseWorldPositionUV;
             float4 _BaseMap_ST;
+            float4 _SecondTiling;
             half4 _BaseColor;
             half _TwistStrength;
             half _CausticsHeight;
@@ -138,6 +146,8 @@
             half _RefractionIntensity;
             float _EdgeFade;
             float _WaterDepthRange;
+            float _UseSideFoamMask;
+            float _FoamBase;
             half4 _EdgeColor;
             half4 _ColorBright;
             half4 _ColorDeep;
@@ -182,18 +192,17 @@
                 UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(input);
                 // -------------------------------------
                 //采样 初始化
+                float2 uv1 = lerp(input.uv.xy, input.positionWS.xz, _UseWorldPositionUV);
                 float2 uv2 = input.uv.zw;
                 
                 // float3 positionWS = input.positionWS;
                 float3 normalWS = input.normalWS.xyz;
-                //不公开的参数
-                half sideFoamRange = 0.5;
 
                 //法线混合
                 _NormalTiling1 *= 0.001 * _NormalScale;
                 _NormalTiling2 *= 0.001 * _NormalScale;
-                float2 normalUV1 = input.uv.xy * _NormalTiling1.xy + _NormalTiling1.zw * _Time.y;
-                float2 normalUV2 = input.uv.xy * _NormalTiling2.xy + _NormalTiling2.zw * _Time.y;
+                float2 normalUV1 = uv1 * _NormalTiling1.xy + _NormalTiling1.zw * _Time.y;
+                float2 normalUV2 = uv1 * _NormalTiling2.xy + _NormalTiling2.zw * _Time.y;
                 half4 normal1 = SAMPLE_TEXTURE2D(_BumpMap, sampler_BumpMap, normalUV1);
                 half4 normal2 = SAMPLE_TEXTURE2D(_BumpMap, sampler_BumpMap, normalUV2);
                 half4 normal = lerp(normal1, normal2, 0.5);
@@ -203,7 +212,7 @@
                 half3 viewDirWS = half3(input.normalWS.w, input.tangentWS.w, input.bitangentWS.w);
                 half3x3 TangentToWorld = half3x3(input.tangentWS.xyz, input.bitangentWS.xyz, input.normalWS.xyz);
                 normalWS = TransformTangentToWorld(normalTS, TangentToWorld);
-                normalWS.rgb = NormalizeNormalPerPixel(normalWS.rgb);
+                normalWS = NormalizeNormalPerPixel(normalWS.rgb);
                 half3 viewDirectionWS = SafeNormalize(viewDirWS);
                 
 
@@ -246,17 +255,18 @@
                 float fresnel = 1 - NdotV;
                 fresnel = Pow4(fresnel) * fresnel;
                 fresnel = fresnel * 0.99 + 0.01;            //fresnel remap[0,1]->[0.01,1]
-
                 
-                //水体泡沫               
+                //水体泡沫         
+                half sideFoamRange = 0.5;       //不公开的参数
                 float foam = (abs(normalTS.r) + abs(normalTS.g)) * 10;
                 //水边泡沫颜色
-                half sideFoam = foam * saturate(abs(uv2.y - 0.5) + (1 - edgeFade) * 0.2 - 0.1)*2;
+                half sidefoamMask = lerp(_FoamBase, abs(uv2.y - 0.5), _UseSideFoamMask);
+                half sideFoam = foam * saturate(sidefoamMask + (1 - edgeFade) * 0.2 - 0.1)*2;
                 sideFoam = 1 - sideFoam;
                 sideFoam = step(sideFoam, sideFoamRange);
 
                 //瀑布拐角泡沫，用切线计算瀑布拐角的范围
-                float TdotU = abs(dot(input.tangentWS, float3(0,0.6,0)));
+                float TdotU = abs(dot(input.tangentWS.rgb, float3(0,0.6,0)));
                 float fallCorner = 1 - saturate(abs(TdotU-0.25)*4);
                 fallCorner *= fallCorner + foam;
                 fallCorner = step(1, fallCorner);
@@ -271,27 +281,36 @@
                 BRDFData brdfData = (BRDFData)0;
                 InitializeBRDFData(half3(0,0,0), _Metallic, half3(0.0h, 0.0h, 0.0h), _Smoothness, waterColor.a, brdfData);
 
-                half3 reflectVector = reflect(-viewDirWS, input.normalWS.xyz);
+                half3 reflectVector = reflect(viewDirWS, normalWS);
                 half3 GlossyColor = GlossyEnvironmentReflection(reflectVector, brdfData.perceptualRoughness, _OcclusionStrength);
 
+                GlossyColor = 1 - (1-GlossyColor) * (1-_ColorBright.rgb);
                 // Light mainLight = GetMainLight();
-                // float3 specularNormalWS = normalize(normalWS * float3(1,0.1,1));
-                // float NdotL = saturate(dot(specularNormalWS, mainLight.direction));
+                // float3 specularNormalWS = normalize(normalWS * float3(1,0.4,1));
+                // float NdotL = saturate(dot(normalWS, mainLight.direction));
+                //
+                // half3 specularColor = mainLight.color * NdotL * _ColorBright.rgb * 
+                //     DirectBRDFSpecular(brdfData, normalWS, mainLight.direction, viewDirectionWS);
 
+                float NoV = saturate(dot(normalWS, viewDirectionWS));
                 
-                //颜色采样，焦散纹理
-                float2 base_uv = (input.uv.xy + normalTS.xy * _TwistStrength) * _BaseMap_ST.xy + _BaseMap_ST.zw * _Time.y;
+                //颜色采样，焦散纹理，双重采样
+                float2 base_uv = (uv1 + normalTS.xy * _TwistStrength) * _BaseMap_ST.xy + _BaseMap_ST.zw * _Time.y;
                 base_uv = BumpOffset(TangentToWorld, viewDirectionWS, base_uv, _CausticsHeight, 1 - waterDepthRemap, 0);
                 half4 albedoAlpha = SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, base_uv);
+                base_uv = base_uv*_SecondTiling.xy + _Time.y * _BaseMap_ST.zw*(_SecondTiling.zw-1);
+                albedoAlpha += SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, base_uv);
                 albedoAlpha *= _BaseColor;
 
                 //颜色混合
-                half sideColorRange = 1.5;
+                half sideColorRange = 1.5;      //不公开的参数
                 half4 color = albedoAlpha * NdotV * (saturate(input.normalWS.y-0.9) * 10) * saturate((sideColorRange - edgeRange) * sideColorRange); 
                 color.rgb += lerp(waterColor.rgb, GlossyColor, fresnel);
                 color.a = waterColor.a;
 
                 color = lerp(color, foam * saturate(_EdgeColor * 1.5), foam * _EdgeColor.a);
+
+                // color.rgb += specularColor;
                 
                 return color;
             }

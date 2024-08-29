@@ -3,35 +3,52 @@ using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
 
-public class CustomOpaqueRenderPassFeature : ScriptableRendererFeature
+public class SolidColorTransitionRenderPassFeature : ScriptableRendererFeature
 {
     public Settings settings = new Settings();
-    
+    public RenderSettings renderSettings = new RenderSettings();
+
     [System.Serializable]
     public class Settings
     {
         //设置渲染顺序
-        public RenderPassEvent renderPassEvent = RenderPassEvent.BeforeRenderingTransparents;
+        public RenderPassEvent renderPassEvent = RenderPassEvent.AfterRenderingPostProcessing;
+    }
+    [System.Serializable]
+    public class RenderSettings
+    {
+        public Material material;
+        public Color transitionColor = Color.black;
+        [Range(0, 1)]
+        public float levelTransition = 0;
     }
     /// <summary>
     /// 自定义可编程的RenderPass
     /// </summary>
-    class CustomOpaqueRenderPass : ScriptableRenderPass
+    class DesaturateStencilRenderPass : ScriptableRenderPass
     {
-        private static readonly string RenderTag = "CustomOpaque";
-        private RenderTargetIdentifier _currentTarget;      //设置当前渲染目标
+        private static readonly string RenderTag = "SolidColorTransition";
+        // private RenderTargetIdentifier _currentTarget;      //设置当前渲染目标
+        private Material _postProcessMat;
+        private Color _transitionColor;
+        private float _levelTransition;
         
         #region 设置渲染事件
-        public CustomOpaqueRenderPass(RenderPassEvent evt)
+        public DesaturateStencilRenderPass(RenderSettings renderSettings, RenderPassEvent evt)
         {
             renderPassEvent = evt;
+            _postProcessMat = renderSettings.material;
+            _transitionColor = renderSettings.transitionColor;
+            _levelTransition = renderSettings.levelTransition;
         }
         #endregion
         
         #region 初始化
-        public void Setup(in RenderTargetIdentifier currentTarget)
+        // public void Setup(in RenderTargetIdentifier currentTarget)
+        public void Setup(ScriptableRenderer renderer,
+            in RenderingData renderingData)
         {
-            this._currentTarget = currentTarget;
+            
         }
         #endregion
         // This method is called before executing the render pass.
@@ -63,22 +80,14 @@ public class CustomOpaqueRenderPassFeature : ScriptableRendererFeature
 
         void Render(CommandBuffer cmd, ref RenderingData renderingData)
         {
-            ref var cameraData = ref renderingData.cameraData;
-            var camera = cameraData.camera;
-            
-            var source = _currentTarget;
+            Camera camera = renderingData.cameraData.camera;
+            Color color = _transitionColor;
+            color.a *= _levelTransition;
+            _postProcessMat.SetColor("_BaseColor", color);
 
-            //暂存当前的颜色并传递给
-            int tmpSceneColor = Shader.PropertyToID("CustomOpaqueTexture");
-            RenderTextureDescriptor desc = cameraData.cameraTargetDescriptor;
-            cmd.GetTemporaryRT(tmpSceneColor, desc);
-            cmd.Blit(source, tmpSceneColor);
-            cmd.SetGlobalTexture("_CameraOpaqueTexture", tmpSceneColor);
-            
-            cmd.ReleaseTemporaryRT(tmpSceneColor);
-            // 修改回渲染目标
-            cmd.SetRenderTarget(cameraData.renderer.cameraColorTarget, RenderBufferLoadAction.DontCare, RenderBufferStoreAction.Store,
-                cameraData.renderer.cameraDepthTarget, RenderBufferLoadAction.DontCare, RenderBufferStoreAction.Store);
+            cmd.SetViewProjectionMatrices(Matrix4x4.identity, Matrix4x4.identity);
+            cmd.DrawMesh(RenderingUtils.fullscreenMesh, Matrix4x4.identity, _postProcessMat, 0, 0);
+            cmd.SetViewProjectionMatrices(camera.worldToCameraMatrix, camera.projectionMatrix);
 
         }
 
@@ -90,12 +99,12 @@ public class CustomOpaqueRenderPassFeature : ScriptableRendererFeature
         }
     }
 
-    CustomOpaqueRenderPass m_ScriptablePass;
+    DesaturateStencilRenderPass m_ScriptablePass;
     /// <inheritdoc/>
     public override void Create()
     {
-        // this.name = "CustomOpaque";
-        m_ScriptablePass = new CustomOpaqueRenderPass(settings.renderPassEvent);
+        // this.name = "SolidColorTransition";
+        m_ScriptablePass = new DesaturateStencilRenderPass(renderSettings ,settings.renderPassEvent);
     }
 
     // Here you can inject one or multiple render passes in the renderer.
@@ -108,7 +117,14 @@ public class CustomOpaqueRenderPassFeature : ScriptableRendererFeature
         {
             return;
         }
-        m_ScriptablePass.Setup(renderer.cameraColorTarget);
-        renderer.EnqueuePass(m_ScriptablePass);
+
+        if (renderSettings.material != null)
+        {
+            renderer.EnqueuePass(m_ScriptablePass);
+        }
+        // m_ScriptablePass.Setup(renderer.cameraColorTarget);
+        // m_ScriptablePass.Setup(renderer, renderingData);
     }
 }
+
+

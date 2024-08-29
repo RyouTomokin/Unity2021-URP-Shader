@@ -136,7 +136,7 @@
                     real depth = SampleSceneDepth(screenUV);
                 #else
                     //  调整 Z 以匹配 OpenGL 的 NDC ([-1, 1])
-                    real depth = lerp(UNITY_NEAR_CLIP_VALUE, 1, SampleSceneDepth(UV));
+                    real depth = lerp(UNITY_NEAR_CLIP_VALUE, 1, SampleSceneDepth(screenUV));
                 #endif
 
             	// 重映射场景深度

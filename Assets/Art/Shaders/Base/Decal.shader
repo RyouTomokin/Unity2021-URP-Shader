@@ -68,7 +68,6 @@
             //--------------------------------------
             // GPU Instancing
             #pragma multi_compile_instancing
-            #pragma instancing_options procedural:vertInstancingSetup
             
             #pragma vertex vert_decal
             #pragma fragment frag

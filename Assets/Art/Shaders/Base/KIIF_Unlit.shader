@@ -5,6 +5,8 @@
         [MainColor] _BaseColor("Color", Color) = (1,1,1,1)
         [MainTexture] _BaseMap("Albedo", 2D) = "white" {}
         _MaskMap("遮罩图", 2D) = "white" {}
+        [Enum(UnityEngine.Rendering.BlendMode)] _SrcBlend("SrcBlend", Float) = 1.0
+        [Enum(UnityEngine.Rendering.BlendMode)] _DstBlend("DstBlend", Float) = 0.0
         
 //        [Space(20)]
 //        [Header(Stencil)]
@@ -35,6 +37,7 @@
 //                Pass [_StencilPass]
 //            }
             
+            Blend [_SrcBlend] [_DstBlend]
             ZWrite [_ZWrite]
             Cull [_Cull]
             
@@ -49,18 +52,18 @@
 
             // -------------------------------------
             // Universal Pipeline keywords
-            #pragma multi_compile _ _MAIN_LIGHT_SHADOWS
-            #pragma multi_compile _ _MAIN_LIGHT_SHADOWS_CASCADE
-            #pragma multi_compile _ _ADDITIONAL_LIGHTS_VERTEX _ADDITIONAL_LIGHTS
-            #pragma multi_compile _ _ADDITIONAL_LIGHT_SHADOWS
-            #pragma multi_compile _ _SHADOWS_SOFT
-            #pragma multi_compile _ _MIXED_LIGHTING_SUBTRACTIVE
+            // #pragma multi_compile _ _MAIN_LIGHT_SHADOWS
+            // #pragma multi_compile _ _MAIN_LIGHT_SHADOWS_CASCADE
+            // #pragma multi_compile _ _ADDITIONAL_LIGHTS_VERTEX _ADDITIONAL_LIGHTS
+            // #pragma multi_compile _ _ADDITIONAL_LIGHT_SHADOWS
+            // #pragma multi_compile _ _SHADOWS_SOFT
+            // #pragma multi_compile _ _MIXED_LIGHTING_SUBTRACTIVE
 
             // -------------------------------------
             // Unity defined keywords
-            #pragma multi_compile _ DIRLIGHTMAP_COMBINED
-            #pragma multi_compile _ LIGHTMAP_ON
-            #pragma multi_compile_fog
+            // #pragma multi_compile _ DIRLIGHTMAP_COMBINED
+            // #pragma multi_compile _ LIGHTMAP_ON
+            // #pragma multi_compile_fog
 
             //--------------------------------------
             // GPU Instancing
