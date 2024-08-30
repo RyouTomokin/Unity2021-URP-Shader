@@ -9,11 +9,11 @@
         [Space(20)]
         [Header(Fresnel)]
         [Space(10)]
-        _FresnelColor("FresnelColor", Color) = (0,0,0,0)
+        [HDR] _FresnelColor("FresnelColor", Color) = (0,0,0,0)
         [PowerSlider(4)] _FresnelPower("FresnelPower", Range(0, 10)) = 1
         _FresnelReversal("FresnelReversal", Range(0, 1)) = 0
         [Space(10)]
-        _FresnelColor2("FresnelColor2", Color) = (0,0,0,0)
+        [HDR] _FresnelColor2("FresnelColor2", Color) = (0,0,0,0)
         [PowerSlider(4)] _FresnelPower2("FresnelPower2", Range(0, 10)) = 1
         _FresnelReversal2("FresnelReversal2", Range(0, 1)) = 1
         
