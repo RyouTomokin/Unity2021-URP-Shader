@@ -14,13 +14,16 @@
         [Space]
         [NoScaleOffset] _MatCapMap("MatCap", 2D) = "black" {}
         _MatCapAdjust("MatCapAdjust", Range(0, 0.5)) = 0.5
+        _MatCapSaturation("MatCapSaturation", Range(0, 1)) = 1
         _MatCapIntensity("MatCapIntensity", Range(0, 1)) = 1
+        _MatCapSpecular("MatCapSpecular", Range(0, 1)) = 0
         
         [Space(20)]
         [Header(Refraction)]
         [Space]
         _RefractionIntensity("RefractionIntensity", Range(0, 1)) = 0
-        _RefractionRange("RefractionRange", Range(0, 2)) = 1
+        [PowerSlider(2)] _RefractionRange("RefractionRange", Range(0, 5)) = 1
+        _Vitreous("Vitreous", Range(0, 1)) = 0
         
 //        [Space(20)]
 //        [Header(Stencil)]
@@ -116,9 +119,12 @@
             float4 _BaseMap_ST;
             half _BumpScale;
             half _MatCapAdjust;
+            half _MatCapSaturation;
             half _MatCapIntensity;
+            half _MatCapSpecular;
             half _RefractionIntensity;
             half _RefractionRange;
+            half _Vitreous;
             CBUFFER_END
 
             TEXTURE2D(_BaseMap);            SAMPLER(sampler_BaseMap);
@@ -189,6 +195,7 @@
                 // half2 matcapUV = normalVS.xy * 0.5 + 0.5;    //只使用视角空间法线会在透视摄像机边缘产生畸变
 
                 half4 matcapColor = SAMPLE_TEXTURE2D(_MatCapMap, sampler_MatCapMap, matcapUV);
+                matcapColor.rgb = Desaturate(matcapColor.rgb, _MatCapSaturation);
                 matcapColor *= _MatCapIntensity;
                 
                 // -------------------------------------
@@ -208,8 +215,10 @@
                 float NdotV = saturate(dot(normalWS, viewDirWS));
                 float fresnel = 1 - NdotV;
                 fresnel = Pow4(fresnel) * fresnel;
-                fresnel = fresnel * 0.99 + 0.01; 
+                fresnel = fresnel * 0.99 + 0.01;    
                 float refractionFade = smoothstep(0, _RefractionRange, NdotV);
+                refractionFade = lerp(refractionFade, 1 - refractionFade, _Vitreous);
+                
                 fresnel += refractionFade;
                 
                 half2 refractionIntensity = normalVS.xy * _RefractionIntensity;
@@ -218,13 +227,23 @@
                 half4 sceneColor = half4(SampleSceneColor(refractionUV), 1);
                 // sceneColor.rgb = 1 - (1 - sceneColor.rgb) * (1 - color.rgb); //滤色会让材质变更白
                 fresnel *= alpha;
-                sceneColor = lerp(sceneColor, color * sceneColor, alpha);
-                color.rgb *= max(1, fresnel);
+                sceneColor = lerp(sceneColor, color * sceneColor, lerp(alpha, min(alpha, matcapColor), _Vitreous));
+                // half4 vitreousSceneColor = lerp(color * sceneColor, 1-(1-matcapColor)*(1-sceneColor), _Vitreous);
+                // sceneColor = lerp(sceneColor, vitreousSceneColor, alpha);
+                
+                color.rgb *= max(1, fresnel * _MatCapSpecular); //边缘光强度
                 
                 color.rgb = lerp(sceneColor.rgb, color.rgb, saturate(fresnel));
 
                 // -------------------------------------
                 
+
+                half lightness = dot(matcapColor.rgb, half3(0.299, 0.587, 0.114));
+                half specularRange = lerp(1, 0.5, _MatCapSpecular);
+                lightness = saturate(lightness - specularRange) * (rcp(max(HALF_MIN, 1 - specularRange)) + _MatCapSpecular);
+                half3 specularColor = lightness * lightness * _MainLightColor.rgb * _MatCapSpecular;
+                
+                color.rgb += specularColor;
                 color.a = alpha;
                
                 return color;

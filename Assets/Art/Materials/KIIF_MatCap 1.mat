@@ -7,7 +7,7 @@ Material:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: KIIF_MatCap
+  m_Name: KIIF_MatCap 1
   m_Shader: {fileID: 4800000, guid: 2ac04d04ad918f04fa6c8cfb291911d0, type: 3}
   m_ValidKeywords:
   - _NORMALMAP_ON
@@ -40,13 +40,13 @@ Material:
     - _Cull: 2
     - _MatCapAdjust: 0.5
     - _MatCapIntensity: 1
-    - _MatCapSaturation: 1
+    - _MatCapSaturation: 0
     - _MatCapSpecular: 1
     - _NORMALMAP: 1
     - _RefractionIntensity: 0.133
     - _RefractionRange: 1.114
     - _Surface: 0
-    - _Vitreous: 0
+    - _Vitreous: 1
     - _ZWrite: 1
     m_Colors:
     - _BaseColor: {r: 1, g: 1, b: 1, a: 1}
