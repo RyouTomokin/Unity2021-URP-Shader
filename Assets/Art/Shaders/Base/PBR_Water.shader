@@ -222,7 +222,7 @@
                 float sceneEyeDepth = LinearEyeDepth(sceneRawDepth, _ZBufferParams);
                 
                 //水体折射
-                float refractionFade = saturate(sceneEyeDepth * rcp(_RefractionFade));    //sceneEyeDepth remap[0,_RefractionFade]->[0,1]
+                float refractionFade = saturate(sceneEyeDepth * rcp(_RefractionFade));    //sceneEyeDepth remap[0,_RefractionFade]->[1,0]
                 refractionFade = 1 - refractionFade;
                 half2 refractionIntensity = normalTS.xy * _RefractionIntensity;
                 half2 refractionUV = screenUV + refractionFade * refractionIntensity;

@@ -1,4 +1,4 @@
-﻿Shader "KIIF/MatCap"
+﻿Shader "KIIF/MatCap_Adv"
 {
     Properties
     {
@@ -12,15 +12,18 @@
         [Space(20)]
         [Header(MatCapMap)]
         [Space]
-        [NoScaleOffset] _MatCapMap("MatCap", 2D) = "black" {}
+        _MatCapMap("MatCap", 2D) = "black" {}
         _MatCapAdjust("MatCapAdjust", Range(0, 0.5)) = 0.5
         _MatCapSaturation("MatCapSaturation", Range(0, 1)) = 1
-        _MatCapIntensity("MatCapIntensity", Range(0, 1)) = 1
+        _MatCapIntensity("MatCapIntensity", Range(0, 10)) = 1
         _MatCapSpecular("MatCapSpecular", Range(0, 1)) = 0
         
         [Space(20)]
         [Header(Refraction)]
         [Space]
+        _ScreenMap("ScreenMap", 2D) = "black" {}
+        _ScreenSpeed("ScreenSpeed", Float) = 0
+        _ScreenIntensity("ScreenIntensity", Float) = 1
         _RefractionIntensity("RefractionIntensity", Range(0, 1)) = 0
         [PowerSlider(2)] _RefractionRange("RefractionRange", Range(0, 5)) = 1
         _Vitreous("Vitreous", Range(0, 1)) = 0
@@ -118,10 +121,15 @@
             half4 _BaseColor;
             float4 _BaseMap_ST;
             half _BumpScale;
+            float4 _MatCapMap_ST;
             half _MatCapAdjust;
             half _MatCapSaturation;
             half _MatCapIntensity;
             half _MatCapSpecular;
+            
+            float4 _ScreenMap_ST;
+            half _ScreenSpeed;
+            half _ScreenIntensity;
             half _RefractionIntensity;
             half _RefractionRange;
             half _Vitreous;
@@ -130,6 +138,7 @@
             TEXTURE2D(_BaseMap);            SAMPLER(sampler_BaseMap);
             TEXTURE2D(_BumpMap);            SAMPLER(sampler_BumpMap);
             TEXTURE2D(_MatCapMap);          SAMPLER(sampler_MatCapMap);
+            TEXTURE2D(_ScreenMap);          SAMPLER(sampler_ScreenMap);
 
             VaryingsUnlit vert_Unlit(AttributesUnlit input)
             {
@@ -140,6 +149,7 @@
                 UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(output);
 
                 VertexPositionInputs vertexInput = GetVertexPositionInputs(input.positionOS.xyz);
+                // input.normalOS = normalize(input.positionOS);
                 VertexNormalInputs normalInput = GetVertexNormalInputs(input.normalOS, input.tangentOS);
                 output.uv = input.uv;
 
@@ -167,7 +177,6 @@
 
                 // -------------------------------------
                 //颜色采样
-
                 float2 baseUV = input.uv * _BaseMap_ST.xy + _BaseMap_ST.zw * _Time.y ;
                 half4 albedoAlpha = SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, baseUV);
                 
@@ -191,6 +200,7 @@
                 half3 normalVS = mul(UNITY_MATRIX_V, float4(normalWS, 0.0)).xyz;        //这里输入的世界法线必须是xyz0,作为方向
                 half3 positionVS = normalize(input.positionVS);
                 half2 matcapUV = cross(positionVS, normalVS).xy;
+                // return half4(matcapUV,0,1);
                 matcapUV = matcapUV.yx * half2(-1, 1) * _MatCapAdjust + 0.5;
                 // half2 matcapUV = normalVS.xy * 0.5 + 0.5;    //只使用视角空间法线会在透视摄像机边缘产生畸变
 
@@ -200,7 +210,7 @@
                 
                 // -------------------------------------
                 //颜色混合
-                color.rgb = matcapColor * albedo + albedo;       //保留albedo颜色
+                color.rgb = matcapColor.rgb * albedo + albedo;       //保留albedo颜色
                 // color.rgb = matcapColor * (albedo + 1);       //保留MatCap颜色
                 // color.rgb = 1 - (1 - matcapColor) * (1 - albedo);       //滤色
                 // color.rgb = lerp(albedo, matcapColor, matcapColor);     //MatCap高光
@@ -221,12 +231,24 @@
                 
                 fresnel += refractionFade;
                 
+                half vitreousRefractionFade = lerp(refractionFade, 1-refractionFade, _Vitreous);    //玻璃片为中间透，玻璃越透的地方扭曲越大
                 half2 refractionIntensity = normalVS.xy * _RefractionIntensity;
-                half2 refractionUV = screenUV - refractionFade * refractionIntensity;
-                
+                //TODO:现在固定折射强度，日后可加随视野深度（EyeDepth）改变折射强度
+                half2 refractionUV = screenUV - vitreousRefractionFade * refractionIntensity;
+
+
+                refractionUV = refractionUV * _ScreenMap_ST.xy + _ScreenMap_ST.zw * _ScreenSpeed * _Time.y;
+                half4 screenMapColor = SAMPLE_TEXTURE2D(_ScreenMap, sampler_ScreenMap, refractionUV);
+                screenMapColor *= _ScreenIntensity;
+                // return matcapColor;
+
                 half4 sceneColor = half4(SampleSceneColor(refractionUV), 1);
+                sceneColor = screenMapColor;
                 // sceneColor.rgb = 1 - (1 - sceneColor.rgb) * (1 - color.rgb); //滤色会让材质变更白
                 fresnel *= alpha;
+
+                // -------------------------------------
+                //颜色混合
                 sceneColor = lerp(sceneColor, color * sceneColor, lerp(alpha, min(alpha, matcapColor), _Vitreous));
                 // half4 vitreousSceneColor = lerp(color * sceneColor, 1-(1-matcapColor)*(1-sceneColor), _Vitreous);
                 // sceneColor = lerp(sceneColor, vitreousSceneColor, alpha);
@@ -236,7 +258,7 @@
                 color.rgb = lerp(sceneColor.rgb, color.rgb, saturate(fresnel));
 
                 // -------------------------------------
-                
+                //高光
 
                 half lightness = dot(matcapColor.rgb, half3(0.299, 0.587, 0.114));
                 half specularRange = lerp(1, 0.5, _MatCapSpecular);
