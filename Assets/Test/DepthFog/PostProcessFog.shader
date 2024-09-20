@@ -2,8 +2,11 @@
 {
     Properties
     {
-    	[MainColor][HDR] _BaseColor("Color", Color) = (1,1,1,1)
+    	[MainColor][HDR] _BaseColor("BaseColor", Color) = (1,1,1,1)
+    	[HDR] _FogColor("FogColor", Color) = (1,1,1,1)
     	[MainTexture] _BaseMap("雾纹理", 2D) = "white" {}
+    	
+    	_FogStrength("雾浓度", Range(0, 1)) = 0
         
         _FogDistance("雾深度比例", Float) = 1
     	
@@ -92,7 +95,9 @@
 
 			CBUFFER_START(UnityPerMaterial)
             half4 _BaseColor;
+            half4 _FogColor;
             float4 _BaseMap_ST;
+			float _FogStrength;
 			float _FogDistance;
 			float _FogStartDistance;
 			float _FogFarDistance;
@@ -140,7 +145,8 @@
                 #endif
 
             	// 重映射场景深度
-            	float depthRemap = max((depth * 1000 - _FogStartDistance) * _FogDistance , 0);
+            	float overDensity = (depth * 1000 - _FogStartDistance) * _FogDistance;
+            	float depthRemap = max(overDensity , 0);
             	depthRemap = smoothstep(1, 0, depthRemap);
             	// return half4(depthRemap * half3(1,1,1), 1);
 
@@ -179,6 +185,7 @@
 
             	// 雾密度
             	density *= depthRemap;
+            	half deepFog = lerp(density, 1, _FogStrength);
             	density += depthRemap;
             	density = saturate(density);
 				// 雾最远的裁切距离
@@ -186,7 +193,8 @@
             	// 只显示在下方的雾
 				density *= step(cameraDir.y, 0);
 
-            	half4 color = _BaseColor;
+            	half4 color = lerp(_BaseColor, _FogColor, deepFog);		//控制基底的雾的浓度
+            	color = lerp(color, _FogColor, smoothstep(-0.1, 0.5, overDensity));	//在超出最大深度的地方添加基底雾颜色
             	color.a *= density;
                 return color;
             }

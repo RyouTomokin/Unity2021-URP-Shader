@@ -60,7 +60,7 @@
             
             HLSLPROGRAM
 
-            #pragma exclude_renderers gles gles3 glcore
+            // #pragma exclude_renderers gles gles3 glcore
             #pragma target 4.5
 
             // -------------------------------------
@@ -231,7 +231,7 @@
                 //随视野深度（EyeDepth）改变折射强度
                 float sceneRawDepth = SampleSceneDepth(screenUV);
                 float sceneEyeDepth = LinearEyeDepth(sceneRawDepth, _ZBufferParams);
-                float refractionEyeDepthFade = saturate(sceneEyeDepth * rcp(_RefractionFade));    //sceneEyeDepth remap[0,_RefractionFade]->[1,0]
+                float refractionEyeDepthFade = saturate(1 - sceneEyeDepth * rcp(_RefractionFade));      //sceneEyeDepth remap[0,_RefractionFade]->[1,0]
                 
                 half2 refractionUV = screenUV - vitreousRefractionFade * refractionIntensity * refractionEyeDepthFade;
 
