@@ -1,0 +1,181 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &-6332762570475196385
+MonoBehaviour:
+  m_ObjectHideFlags: 11
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d0353a89b1f911e48b9e16bdc9f2e058, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  version: 1
+--- !u!21 &2100000
+Material:
+  serializedVersion: 8
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: LavaFall
+  m_Shader: {fileID: 4800000, guid: 13d6c72a4b575fc44a3db0492eb5965e, type: 3}
+  m_ValidKeywords:
+  - _FLOWMAP_ON
+  m_InvalidKeywords:
+  - _DirectionFlow
+  - _FlowEdge
+  m_LightmapFlags: 4
+  m_EnableInstancingVariants: 1
+  m_DoubleSidedGI: 0
+  m_CustomRenderQueue: -1
+  stringTagMap: {}
+  disabledShaderPasses: []
+  m_SavedProperties:
+    serializedVersion: 3
+    m_TexEnvs:
+    - _BaseMap:
+        m_Texture: {fileID: 2800000, guid: 1cde0bd09c170284ea8aec94b3af7781, type: 3}
+        m_Scale: {x: 1, y: 0.6}
+        m_Offset: {x: 0, y: 1}
+    - _Clip:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _Cube:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _Diffuse:
+        m_Texture: {fileID: 2800000, guid: ffd4cb1892e349b4589c2eeccd285df7, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _Diffuse1:
+        m_Texture: {fileID: 2800000, guid: ffd4cb1892e349b4589c2eeccd285df7, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _DissolveTex:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 3.09, y: 1.29}
+        m_Offset: {x: 0, y: 0}
+    - _FlowMap:
+        m_Texture: {fileID: 2800000, guid: bc2f49eafe41a1e4c892991e48d8c723, type: 3}
+        m_Scale: {x: 1, y: 3.78}
+        m_Offset: {x: 0, y: -0.32}
+    - _Flowmap:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _FrothTexture:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 5, y: 5}
+        m_Offset: {x: 0, y: 0}
+    - _ReflectNormal:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 0.2, y: 0.1}
+        m_Offset: {x: 0, y: 0}
+    - _ShapeTexture:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1.22, y: 1}
+        m_Offset: {x: 0, y: 0.3}
+    - _Texture0:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _TextureSample0:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _TextureSample2:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _Wave_Tex:
+        m_Texture: {fileID: 2800000, guid: ffd4cb1892e349b4589c2eeccd285df7, type: 3}
+        m_Scale: {x: 1, y: 0.6}
+        m_Offset: {x: 0, y: 0}
+    - _Wave_Tex1:
+        m_Texture: {fileID: 2800000, guid: ffd4cb1892e349b4589c2eeccd285df7, type: 3}
+        m_Scale: {x: 1, y: 0.6}
+        m_Offset: {x: 0, y: 0}
+    - _Wave_Tex2:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 5, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _texcoord:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    m_Ints: []
+    m_Floats:
+    - _AlphaCutoff: 0.5
+    - _AlphaTest: 0
+    - _Blend: 1
+    - _Blend1: 1
+    - _BlendEm: 5
+    - _Brighten: 1.43
+    - _Cull: 2
+    - _Cutoff: 0.5
+    - _Dissolve: 4.07
+    - _DissolveBlend: 7.65
+    - _DissolveTex_X: 0
+    - _DissolveTex_Y: 0.08
+    - _DstBlend: 10
+    - _EdgeBlend: 1
+    - _FLOWMAP: 1
+    - _Float1: 0.5
+    - _Float2: -2.54
+    - _Float5: 0.443
+    - _FlowDistance: 0
+    - _FlowSpeed: 0.01
+    - _FresnelBias: 3.04
+    - _FresnelPower: 2
+    - _FresnelScale: 1
+    - _Froth: 0
+    - _FrothEdge: 0.728
+    - _FrothLerp: 0.648
+    - _FrothSpeed: 0.62
+    - _FrothViscosity: 0.631
+    - _Lerp1: 0.035
+    - _Lerp2: 0.294
+    - _MaxDeth: 1.6
+    - _NormalScale: 1
+    - _RefractionSize: 1
+    - _Speed: 0.05
+    - _Speed1: 0
+    - _SrcBlend: 5
+    - _TailBlend: 0.064
+    - _TessEdgeLength: 16
+    - _TessMax: 25
+    - _TessMaxDisp: 25
+    - _TessMin: 10
+    - _TessPhongStrength: 0.5
+    - _TessValue: 16
+    - _Tiling: 1.34
+    - _Tiling1: 2.11
+    - _Tiling2: 8.13
+    - _UVBlend: 6.44
+    - _WaterDirection: 0
+    - _Wave_Speed1_00: 0
+    - _Wave_Speed1_01: 0.1
+    - _Wave_Speed1_X: 0
+    - _Wave_Speed1_Y: 0.05
+    - _Wave_Speed2_00: 0
+    - _Wave_Speed2_01: 0
+    - _Wave_Speed2_X: 0.02
+    - _Wave_Speed2_Y: 0.04
+    - _Wave_Speed_X: 0
+    - _Wave_Speed_Y: 0.05
+    - _ZWrite: 1
+    - __dirty: 0
+    m_Colors:
+    - _BaseColor: {r: 1, g: 0.8392157, b: 0.7254902, a: 1}
+    - _Color: {r: 1, g: 1, b: 1, a: 1}
+    - _Color0: {r: 0.23584908, g: 0.23584908, b: 0.23584908, a: 1}
+    - _Color1: {r: 0.990566, g: 0.990566, b: 0.990566, a: 1}
+    - _CubeColor: {r: 1, g: 0.6744267, b: 0.2924528, a: 1}
+    - _EmissionColor: {r: 1, g: 1, b: 1, a: 1}
+    - _FrothTint: {r: 0.6650944, g: 1, b: 0.9837797, a: 1}
+  m_BuildTextureStacks: []
