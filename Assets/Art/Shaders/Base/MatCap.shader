@@ -26,6 +26,13 @@
         [PowerSlider(2)] _RefractionRange("RefractionRange", Range(0, 5)) = 1
         _Vitreous("Vitreous", Range(0, 1)) = 0
         
+        [Space(20)]
+        [Header(Emission)]
+        [Space]
+        [HDR] _EmissionColor("自发光颜色", Color) = (0,0,0)
+        _EmissionMap("Emission", 2D) = "white" {}
+        _EmissionStrength("自发光强度", Range(0.0, 1.0)) = 0.0
+        
 //        [Space(20)]
 //        [Header(Stencil)]
 //        [Space]
@@ -129,11 +136,17 @@
             half _RefractionIntensity;
             half _RefractionRange;
             half _Vitreous;
+
+            half4 _EmissionColor;
+            float4 _EmissionMap_ST;;
+            half _EmissionStrength;
+            
             CBUFFER_END
 
             TEXTURE2D(_BaseMap);            SAMPLER(sampler_BaseMap);
             TEXTURE2D(_BumpMap);            SAMPLER(sampler_BumpMap);
             TEXTURE2D(_MatCapMap);          SAMPLER(sampler_MatCapMap);
+            TEXTURE2D(_EmissionMap);        SAMPLER(sampler_EmissionMap);
 
             VaryingsUnlit vert_Unlit(AttributesUnlit input)
             {
@@ -259,6 +272,12 @@
                 
                 color.rgb += specularColor;
                 color.a = alpha;
+
+                // -------------------------------------
+                //自发光
+                float2 emissionUV = input.uv * _EmissionMap_ST.xy + _EmissionMap_ST.zw * _Time.y ;
+                half4 EmissionColor = SAMPLE_TEXTURE2D(_EmissionMap, sampler_EmissionMap, emissionUV);
+                color.rgb += EmissionColor.rgb * _EmissionColor.rgb * _EmissionStrength;
                
                 return color;
             }

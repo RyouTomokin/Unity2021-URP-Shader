@@ -1,23 +1,41 @@
-﻿Shader "KIIF/Unlit"
+﻿Shader "KIIF/Skill_Indicator"
 {
     Properties
     {
+        [Header(Base)]
         [HDR][MainColor] _BaseColor("Color", Color) = (1,1,1,1)
-        [MainTexture] _BaseMap("Albedo", 2D) = "white" {}
-        _MaskMap("遮罩图", 2D) = "white" {}
-        [Enum(UnityEngine.Rendering.BlendMode)] _SrcBlend("SrcBlend", Float) = 1.0
-        [Enum(UnityEngine.Rendering.BlendMode)] _DstBlend("DstBlend", Float) = 0.0
+        [PowerSlider(2)] _HideAlpha("HideAlpha", Range(0, 1)) = 0.2
+        [MainTexture] _BaseMap("遮罩:R扇形 G流动 B指示器 A Alpha", 2D) = "white" {}
+        _Intensity("Intensity", float) = 1
         
-//        [Space(20)]
-//        [Header(Stencil)]
-//        [Space]
-//        _RefValue("Ref Value",Int) = 0
-//        [Enum(UnityEngine.Rendering.CompareFunction)] _StencilComp("Stencil Comp",Int) = 8      //默认Always
-//        [Enum(UnityEngine.Rendering.StencilOp)] _StencilPass("Stencil Pass",Int) = 0            //默认Keep
+        [Header(Sector)]
+        [MaterialToggle] _Sector("Sector", Float) = 1
+        _Angle ("Angle", Range(0, 360)) = 60
+        _Outline ("Outline", Range(0, 5)) = 0.35
+        _OutlineAlpha("Outline Alpha",Range(0,1))=0.5
+        [MaterialToggle] _Indicator("Indicator", Float) = 1
         
-        [HideInInspector] _Surface("__surface", Float) = 0.0
-        [HideInInspector] _AlphaClip("__clip", Float) = 0.0
-        [HideInInspector] _ZWrite("__zw", Float) = 1.0
+        [Header(Flow)]
+        _FlowColor("Flow Color",color) = (1,1,1,1)
+        _FlowFade("Fade",range(0,1)) = 1
+        _Duration("Duration",range(0,1)) = 0
+
+        [Header(Blend)]
+        [Enum(UnityEngine.Rendering.BlendMode)] _SrcBlend("SrcBlend", Int) = 5
+        [Enum(UnityEngine.Rendering.BlendMode)] _DstBlend("DstBlend", Int) = 10
+        
+        
+        [Space(20)]
+        [Header(Stencil)]
+        [Space]
+        _RefValue("Ref Value",Int) = 0
+        [Enum(UnityEngine.Rendering.CompareFunction)] _StencilComp("Stencil Comp",Int) = 8      //默认Always
+        [Enum(UnityEngine.Rendering.StencilOp)] _StencilPass("Stencil Pass",Int) = 0            //默认Keep
+        
+        
+//        [HideInInspector] _Surface("__surface", Float) = 0.0
+//        [HideInInspector] _AlphaClip("__clip", Float) = 0.0
+        [HideInInspector] _ZWrite("__zw", Float) = 0.0
         [HideInInspector] _Cull("__cull", Float) = 2.0
     }
     SubShader
@@ -30,24 +48,26 @@
 //            Name "ForwardLit"
 //            Tags{"LightMode" = "UniversalForward"}
             
-//            Stencil
-//            {
-//                Ref [_RefValue]
-//                Comp [_StencilComp]
-//                Pass [_StencilPass]
-//            }
+            Stencil
+            {
+                Ref [_RefValue]
+                Comp [_StencilComp]
+                Pass [_StencilPass]
+            }
             
             Blend [_SrcBlend] [_DstBlend]
             ZWrite [_ZWrite]
+            ZTest Off
             Cull [_Cull]
             
             HLSLPROGRAM
 
-            #pragma exclude_renderers gles gles3 glcore
+            // #pragma exclude_renderers gles gles3 glcore
             #pragma target 4.5
 
             // -------------------------------------
             // Material Keywords
+            #pragma multi_compile __ _INDICATOR_ON
             #pragma shader_feature _SOFTPARTICLES_ON
 
             // -------------------------------------
@@ -82,8 +102,8 @@
                 float2 uv                       : TEXCOORD0;
                 half4 color                     : COLOR;
                 
-                float3 normalOS                 : NORMAL;
-                float4 tangentOS                : TANGENT;
+                // float3 normalOS                 : NORMAL;
+                // float4 tangentOS                : TANGENT;
                 UNITY_VERTEX_INPUT_INSTANCE_ID
             };
             
@@ -97,6 +117,8 @@
                 // float4 normalWS                 : TEXCOORD3;    // xyz: normal
                 // float4 tangentWS                : TEXCOORD4;    // xyz: tangent
                 // float4 bitangentWS              : TEXCOORD5;    // xyz: bitangent
+                float3 positionWS               : TEXCOORD5;
+                float4 projectedPosition        : TEXCOORD6;
 
                 UNITY_VERTEX_INPUT_INSTANCE_ID
                 UNITY_VERTEX_OUTPUT_STEREO
@@ -105,11 +127,20 @@
             CBUFFER_START(UnityPerMaterial)
             half4 _BaseColor;
             float4 _BaseMap_ST;
-            float4 _MaskMap_ST;
+            float _HideAlpha;
+            half _Intensity;
+            
+            float _Angle;
+            half _Sector;
+            half _Outline;
+            half _OutlineAlpha;
+            
+            half4 _FlowColor;
+            half _FlowFade;
+            half _Duration;
             CBUFFER_END
 
             TEXTURE2D(_BaseMap);            SAMPLER(sampler_BaseMap);
-            TEXTURE2D(_MaskMap);            SAMPLER(sampler_MaskMap);
 
             VaryingsUnlit vert_Unlit(AttributesUnlit input)
             {
@@ -124,6 +155,8 @@
                 output.uv = input.uv;
 
                 output.positionCS = vertexInput.positionCS;
+                output.positionWS = vertexInput.positionWS;
+                output.projectedPosition = vertexInput.positionNDC;
 
                 // -------------------------------------
                 
@@ -135,33 +168,48 @@
                 UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(input);
 
                 // -------------------------------------
-                //采样 初始化
-                float2 maskUV = TRANSFORM_TEX(input.uv, _MaskMap);
-                half4 MaskMap = SAMPLE_TEXTURE2D(_MaskMap, sampler_MaskMap, maskUV);
+                // 采样
 
                 float2 baseUV = input.uv * _BaseMap_ST.xy + _BaseMap_ST.zw * _Time.y ;
-                half4 albedoAlpha = SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, baseUV);
-                half alpha = albedoAlpha.a * _BaseColor.a * MaskMap.r;
-                half3 albedo = albedoAlpha.rgb * _BaseColor.rgb;
-                
+                half4 baseMap = SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, baseUV);
+
                 half4 color;
-                
-                color.a = alpha;
+                // half4 color = albedoAlpha * _BaseColor * _Intensity;
+
+                // -------------------------------------
+                // 指示器
+                #if _INDICATOR_ON
+                    return baseMap.b * 0.6 * _BaseColor;
+                #endif
+
+                float2 centerUV = input.uv * 2 - 1;
+                float atan2UV = 1-abs(atan2(centerUV.g, centerUV.r)/3.14);
+
+                half sector = lerp(1.0, 1.0 - ceil(atan2UV - _Angle*0.002777778), _Sector);
+                half sectorBig = lerp(1.0, 1.0 - ceil(atan2UV - (_Angle+ _Outline) * 0.002777778), _Sector);
+                half outline = (sectorBig - sector) * baseMap.g * _OutlineAlpha;
+
+                half needOutline = 1 - step(359, _Angle);
+                outline *= needOutline;
+                color = baseMap.r * _BaseColor * sector + outline * _BaseColor;
+
+                half flowCircleInner = smoothstep(_Duration - _FlowFade, _Duration, length(centerUV));
+                half flowCircleMask = step(length(centerUV), _Duration);
+                half4 flow = flowCircleInner * flowCircleMask * _FlowColor * baseMap.g * sector;
+
+                color += flow;
 
                 // -------------------------------------
                 // 软粒子
-                // #ifdef _SOFTPARTICLES_ON
-                // float fade = 1;
-                //     float rawDepth = SampleSceneDepth(input.projectedPosition.xy / input.projectedPosition.w).r;
-                //     float sceneZ = (unity_OrthoParams.w == 0) ? LinearEyeDepth(rawDepth, _ZBufferParams) : LinearDepthToEyeDepth(rawDepth);
-                //     float thisZ = LinearEyeDepth(input.positionWS, GetWorldToViewMatrix());
-                //     fade = saturate((sceneZ - thisZ) / _SoftParticle);
-                // color.a *= fade;
-                // #endif
+                float2 screenUV = input.positionCS.xy / _ScaledScreenParams.xy;
+                float rawDepth = SampleSceneDepth(screenUV).r;
+                float sceneZ = (unity_OrthoParams.w == 0) ? LinearEyeDepth(rawDepth, _ZBufferParams) : LinearDepthToEyeDepth(rawDepth);
+                float thisZ = LinearEyeDepth(input.positionWS, GetWorldToViewMatrix());
+                // color.a = sceneZ > thisZ ? color.a : color.a * _HideAlpha;
+                color.a *= lerp(1, _HideAlpha, step(sceneZ - thisZ, 0)); 
 
                 // -------------------------------------
-                
-                color.rgb = albedo;
+                color.a *= baseMap.a;
                 return color;
             }
             ENDHLSL

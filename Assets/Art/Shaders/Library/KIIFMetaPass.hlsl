@@ -7,12 +7,13 @@
 CBUFFER_START(UnityPerMaterial)
 float4 _BaseMap_ST;
 half4 _BaseColor;
-half4 _EmissionColor;
 half _Cutoff;
+half _BumpScale;
 half _Smoothness;
 half _Metallic;
-half _BumpScale;
-half _EmissionStrength;
+half _OcclusionStrength;
+half4 _EmissionColor;
+half _EmissionStrength;    
 CBUFFER_END
 TEXTURE2D(_BaseMap);            SAMPLER(sampler_BaseMap);
 TEXTURE2D(_SMAEMap);            SAMPLER(sampler_SMAEMap);
