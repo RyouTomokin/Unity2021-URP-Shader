@@ -5,6 +5,8 @@
         [Header(Base)]
         [HDR][MainColor] _BaseColor("Color", Color) = (1,1,1,1)
         [PowerSlider(2)] _HideAlpha("HideAlpha", Range(0, 1)) = 0.2
+        _CircleFade("CircleFade", Range(0.01, 1)) = 0
+        _FadeOffset("FadeOffset", Range(0, 1)) = 0
         [MainTexture] _BaseMap("遮罩:R扇形 G流动 B指示器 A Alpha", 2D) = "white" {}
         _Intensity("Intensity", float) = 1
         
@@ -128,6 +130,8 @@
             half4 _BaseColor;
             float4 _BaseMap_ST;
             float _HideAlpha;
+            float _CircleFade;
+            float _FadeOffset;
             half _Intensity;
             
             float _Angle;
@@ -185,6 +189,11 @@
                 float2 centerUV = input.uv * 2 - 1;
                 float atan2UV = 1-abs(atan2(centerUV.g, centerUV.r)/3.14);
 
+                half centerFade = distance(input.uv, half2(0.5, 0.5)) * 2;
+                centerFade -= _FadeOffset;
+                centerFade *= rcp(max(0.01 ,_CircleFade));
+                centerFade = saturate(centerFade);
+
                 half sector = lerp(1.0, 1.0 - ceil(atan2UV - _Angle*0.002777778), _Sector);
                 half sectorBig = lerp(1.0, 1.0 - ceil(atan2UV - (_Angle+ _Outline) * 0.002777778), _Sector);
                 half outline = (sectorBig - sector) * baseMap.g * _OutlineAlpha;
@@ -199,6 +208,8 @@
 
                 color += flow;
 
+                color *= centerFade;
+
                 // -------------------------------------
                 // 软粒子
                 float2 screenUV = input.positionCS.xy / _ScaledScreenParams.xy;
@@ -206,7 +217,7 @@
                 float sceneZ = (unity_OrthoParams.w == 0) ? LinearEyeDepth(rawDepth, _ZBufferParams) : LinearDepthToEyeDepth(rawDepth);
                 float thisZ = LinearEyeDepth(input.positionWS, GetWorldToViewMatrix());
                 // color.a = sceneZ > thisZ ? color.a : color.a * _HideAlpha;
-                color.a *= lerp(1, _HideAlpha, step(sceneZ - thisZ, 0)); 
+                color.rgb *= lerp(1, _HideAlpha, step(sceneZ - thisZ, 0)); 
 
                 // -------------------------------------
                 color.a *= baseMap.a;
