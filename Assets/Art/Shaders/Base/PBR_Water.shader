@@ -23,6 +23,7 @@
         [Header(Water)]
         _EdgeFade("EdgeFade", Range(0, 5)) = 1
         [PowerSlider(2)]_WaterDepthRange("WaterDepthRange", Range(0, 20)) = 2
+        _WaterTransparency("WaterTransparency", Range(0, 1)) = 1
         [Toggle] _UseSideFoamMask("开启河流边缘泡沫", Float) = 1
         _FoamBase("FoamBase", Range(0, 1)) = 0
         //_EdgeColor.a可以控制泡沫的透明度
@@ -108,12 +109,14 @@
                 float4 tangentOS    : TANGENT;
                 float2 texcoord1    : TEXCOORD0;
                 float2 texcoord2    : TEXCOORD1;
+                float4 color        : COLOR;
                 UNITY_VERTEX_INPUT_INSTANCE_ID
             };
 
             struct Varyings
             {
                 float4 uv                       : TEXCOORD0;
+                float4 color                    : COLOR;
                 DECLARE_LIGHTMAP_OR_SH(lightmapUV, vertexSH, 1);
 
                 float3 positionWS               : TEXCOORD2;
@@ -146,6 +149,7 @@
             half _RefractionIntensity;
             float _EdgeFade;
             float _WaterDepthRange;
+            float _WaterTransparency;
             float _UseSideFoamMask;
             float _FoamBase;
             half4 _EdgeColor;
@@ -173,6 +177,7 @@
                 half3 viewDirWS = GetCameraPositionWS() - vertexInput.positionWS;
 
                 output.uv = float4(input.texcoord1, input.texcoord2);
+                output.color = input.color;
 
                 output.normalWS = half4(normalInput.normalWS, viewDirWS.x);
                 output.tangentWS = half4(normalInput.tangentWS, viewDirWS.y);
@@ -193,7 +198,7 @@
                 // -------------------------------------
                 //采样 初始化
                 float2 uv1 = lerp(input.uv.xy, input.positionWS.xz, _UseWorldPositionUV);
-                float2 uv2 = input.uv.zw;
+                // float2 uv2 = input.uv.zw;
                 
                 // float3 positionWS = input.positionWS;
                 float3 normalWS = input.normalWS.xyz;
@@ -246,7 +251,7 @@
 
                 half4 waterColor = lerp(_ColorBright, _ColorDeep, waterDepthRemap);
                 waterColor = lerp(waterColor * sceneColor, waterColor, waterColor.a);
-                waterColor += saturate(lerp(half4(1,1,1,0), _EdgeColor, waterDepth)) * sceneColor;
+                waterColor += saturate(lerp(half4(1,1,1,0), _EdgeColor, waterDepth)) * sceneColor * _WaterTransparency;
                 waterColor = saturate(waterColor);
                 waterColor.a = edgeFade;
 
@@ -260,7 +265,8 @@
                 half sideFoamRange = 0.5;       //不公开的参数
                 float foam = (abs(normalTS.r) + abs(normalTS.g)) * 10;
                 //水边泡沫颜色
-                half sidefoamMask = lerp(_FoamBase, abs(uv2.y - 0.5), _UseSideFoamMask);
+                // half sidefoamMask = lerp(_FoamBase, abs(uv2.y - 0.5), _UseSideFoamMask);
+                half sidefoamMask = lerp(_FoamBase, input.color.r, _UseSideFoamMask);
                 half sideFoam = foam * saturate(sidefoamMask + (1 - edgeFade) * 0.2 - 0.1)*2;
                 sideFoam = 1 - sideFoam;
                 sideFoam = step(sideFoam, sideFoamRange);
@@ -292,7 +298,7 @@
                 // half3 specularColor = mainLight.color * NdotL * _ColorBright.rgb * 
                 //     DirectBRDFSpecular(brdfData, normalWS, mainLight.direction, viewDirectionWS);
 
-                float NoV = saturate(dot(normalWS, viewDirectionWS));
+                // float NoV = saturate(dot(normalWS, viewDirectionWS));
                 
                 //颜色采样，焦散纹理，双重采样
                 float2 base_uv = (uv1 + normalTS.xy * _TwistStrength) * _BaseMap_ST.xy + _BaseMap_ST.zw * _Time.y;

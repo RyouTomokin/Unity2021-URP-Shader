@@ -1,0 +1,194 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!21 &2100000
+Material:
+  serializedVersion: 8
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: M_PoolWater
+  m_Shader: {fileID: 4800000, guid: a5cc09276ca589c419a9690842be1123, type: 3}
+  m_ValidKeywords: []
+  m_InvalidKeywords:
+  - _Caustics
+  - _USEWORLDPOSITIONUV_ON
+  m_LightmapFlags: 4
+  m_EnableInstancingVariants: 0
+  m_DoubleSidedGI: 0
+  m_CustomRenderQueue: 3000
+  stringTagMap: {}
+  disabledShaderPasses: []
+  m_SavedProperties:
+    serializedVersion: 3
+    m_TexEnvs:
+    - _BaseMap:
+        m_Texture: {fileID: 2800000, guid: 0fc39c45141663843b7e97789639496a, type: 3}
+        m_Scale: {x: 0.04, y: 0.04}
+        m_Offset: {x: 0.05, y: 0}
+    - _BumpMap:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _CausticsTexture:
+        m_Texture: {fileID: 2800000, guid: 3728b0f6d41ae26459824b44fab7f205, type: 3}
+        m_Scale: {x: 0.25, y: 0.2}
+        m_Offset: {x: 0.2, y: -0.2}
+    - _Cube:
+        m_Texture: {fileID: 8900000, guid: e70aad467a8efe14e9ccf49787329364, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _EmissionMap:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _FlowShapeTexture:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _FrothTexture:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 4.98, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _MainTex:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _MetallicGlossMap:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _NoiseMap:
+        m_Texture: {fileID: 2800000, guid: 397d5417bd873b64593b7e0ade87dd7f, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: -0.05, y: 0}
+    - _OcclusionMap:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _ReflectNormal:
+        m_Texture: {fileID: 2800000, guid: a2efe8e877351904380dcaf8e5c61980, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _ShapeTexture:
+        m_Texture: {fileID: 2800000, guid: 8189e3af815412340ae03f2d943551fa, type: 3}
+        m_Scale: {x: 0.44, y: 0.48}
+        m_Offset: {x: 6, y: 6}
+    - _SpecGlossMap:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _TwistMap:
+        m_Texture: {fileID: 2800000, guid: 2c53a8ae500874643ad6995d049c4028, type: 3}
+        m_Scale: {x: 0.1, y: 0.1}
+        m_Offset: {x: 1, y: 1}
+    m_Ints: []
+    m_Floats:
+    - _AlphaClip: 0
+    - _Blend: 2.88
+    - _Buffer: 0
+    - _BumpScale: 4
+    - _Caustics: 1
+    - _CausticsDirection: 4.7
+    - _CausticsHeight: -0.2
+    - _Cull: 2
+    - _CullMode: 2
+    - _Cutoff: 0.5
+    - _Deceleration: 1
+    - _DirectionFlow: 0
+    - _DstBlend: 0
+    - _EdgeBlend: 0.43
+    - _EdgeDensity: 16.89
+    - _EdgeFade: 1
+    - _EdgeHard: 0.55
+    - _EdgeSize: 2.7
+    - _EndLerp: 1
+    - _EnvironmentReflections: 1
+    - _FarDistanceFilling: 0.01
+    - _FlowEdge: 0
+    - _FlowEdgeBias: 0.2
+    - _FlowEdgeBlend: 0.5
+    - _FlowLerp: 0
+    - _FlowSpeed: 0
+    - _FlowWaveSpeed: 1
+    - _FoamBase: 0.6
+    - _FoamSize: 10
+    - _FresnelBias: 0
+    - _FresnelPower: 0.79
+    - _FresnelScale: 0
+    - _Froth: 0
+    - _FrothCenter: 0.55
+    - _FrothEdge: 0
+    - _FrothLerp: 1
+    - _FrothSpeed: 1
+    - _FrothViscosity: 0.62
+    - _GlossMapScale: 0
+    - _Glossiness: 0
+    - _GlossyReflections: 0
+    - _Metallic: 0
+    - _NoiseSize: 0.05
+    - _NoiseTwistStrength: 0.1
+    - _NormalScale: 11.56
+    - _OcclusionStrength: 1
+    - _QueueOffset: 0
+    - _ReceiveShadows: 1
+    - _RefValue: 0
+    - _Refraction: 0
+    - _RefractionFade: 300
+    - _RefractionIntensity: 0.01
+    - _RefractionSize: 0
+    - _RefractionSpeedX: -0.017
+    - _RefractionSpeedY: 0.0715
+    - _Smoothness: 0.8
+    - _SmoothnessTextureChannel: 0
+    - _SpecularHighlights: 1
+    - _SrcBlend: 1
+    - _StartLerp: 0
+    - _StencilComp: 8
+    - _StencilPass: 0
+    - _Surface: 0
+    - _TwistSpeed: 0.2
+    - _TwistStrength: 1
+    - _UseSideFoamMask: 0
+    - _UseWorldPositionUV: 1
+    - _WaterDepthRange: 3
+    - _WaterDirection: 0
+    - _WaterTransparency: 1
+    - _WaveSpeed: 0.2
+    - _WorkflowMode: 1
+    - _ZWrite: 1
+    m_Colors:
+    - _BaseColor: {r: 0.35826808, g: 0.5521762, b: 0.7830189, a: 1}
+    - _CausticsColorTint: {r: 0, g: 0.8622582, b: 1, a: 1}
+    - _Color: {r: 0.05887327, g: 0.18010986, b: 0.254717, a: 1}
+    - _ColorBright: {r: 0.15118067, g: 0.8584906, b: 0.78902256, a: 1}
+    - _ColorDeep: {r: 0.06103921, g: 0.23860778, b: 0.283, a: 1}
+    - _CubeColor: {r: 1, g: 1, b: 1, a: 1}
+    - _EdgeColor: {r: 0.30894744, g: 0.3673312, b: 0.38679248, a: 0.42352942}
+    - _EdgeTiling: {r: 1.63, g: 1, b: 0, a: 0}
+    - _EmissionColor: {r: 0, g: 0, b: 0, a: 1}
+    - _FlowEdgeColor: {r: 1, g: 1, b: 1, a: 1}
+    - _FrothTint: {r: 1, g: 1, b: 1, a: 1}
+    - _NoiseColor: {r: 0, g: 1.8509804, b: 2, a: 1}
+    - _NoiseTwist_UV: {r: 1, g: 1, b: 0.1, a: 0}
+    - _NormalTiling1: {r: 1, g: 1, b: -0.2, a: 0}
+    - _NormalTiling2: {r: 2, g: 2, b: 1, a: 0}
+    - _ReflectColor: {r: 0.8584906, g: 0.8301442, b: 0.8301442, a: 1}
+    - _ReflectSpeed: {r: 5, g: 5, b: 0.1, a: 0.1}
+    - _RefractionSpeed: {r: 1, g: 1, b: 0.1, a: 0.1}
+    - _SecondTiling: {r: 2, g: 2, b: -2, a: 0}
+    - _SpecColor: {r: 0.2, g: 0.2, b: 0.2, a: 1}
+  m_BuildTextureStacks: []
+--- !u!114 &1070791178018427887
+MonoBehaviour:
+  m_ObjectHideFlags: 11
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d0353a89b1f911e48b9e16bdc9f2e058, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  version: 1
