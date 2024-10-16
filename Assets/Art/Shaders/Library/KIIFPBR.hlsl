@@ -54,9 +54,9 @@ half _Smoothness;
 half _Metallic;
 half _OcclusionStrength;
 half4 _EmissionColor;
-half _EmissionStrength;
-            
+half _EmissionStrength;            
 CBUFFER_END
+
 TEXTURE2D(_BaseMap);            SAMPLER(sampler_BaseMap);
 TEXTURE2D(_BumpMap);            SAMPLER(sampler_BumpMap);
 TEXTURE2D(_SMAEMap);            SAMPLER(sampler_SMAEMap);
