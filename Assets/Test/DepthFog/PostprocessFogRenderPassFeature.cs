@@ -1,5 +1,3 @@
-using System;
-using Unity.Mathematics;
 using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
@@ -7,14 +5,17 @@ using UnityEngine.Rendering.Universal;
 public class PostprocessFogRenderPassFeature : ScriptableRendererFeature
 {
     public Settings settings = new Settings();
-    
+
     [System.Serializable]
     public class Settings
     {
         //设置渲染顺序
         public RenderPassEvent renderPassEvent = RenderPassEvent.BeforeRenderingTransparents;
         public Material materia;
+        public MaterialPropertyBlock materialPropertyBlock;
+        public bool EnableInEditMode;
     }
+
     /// <summary>
     /// 自定义可编程的RenderPass
     /// </summary>
@@ -22,14 +23,16 @@ public class PostprocessFogRenderPassFeature : ScriptableRendererFeature
     {
         private static readonly string RenderTag = "PostprocessFog";
 
-        // private PostprocessFogVolume _postProcessVolume; //后处理的Volume
-        
-        private Material _postProcessMat;                   //后处理使用材质
-        private RenderTargetIdentifier _currentTarget;      //设置当前渲染目标
-        
+        private PostprecessFogVolume _postProcessVolume; //后处理的Volume
+
+        private MaterialPropertyBlock _materialPropertyBlock;
+        private Material _postProcessMat; //后处理使用材质
+        private RenderTargetIdentifier _currentTarget; //设置当前渲染目标
+
         private bool _desaturateOpaque;
-        
+
         #region 设置渲染事件
+
         public PostprocessFogRenderPass(RenderPassEvent evt, Material postProcessMaterial, Settings settings)
         {
             renderPassEvent = evt;
@@ -39,16 +42,24 @@ public class PostprocessFogRenderPassFeature : ScriptableRendererFeature
                 Debug.LogError("没有指定后处理雾材质");
                 return;
             }
+
+            settings.materialPropertyBlock = new MaterialPropertyBlock();
+            
             _postProcessMat = postProcessMaterial;
+            _materialPropertyBlock = settings.materialPropertyBlock;
         }
+
         #endregion
-        
+
         #region 初始化
+
         public void Setup(in RenderTargetIdentifier currentTarget)
         {
             this._currentTarget = currentTarget;
         }
+
         #endregion
+
         // This method is called before executing the render pass.
         // It can be used to configure render targets and their clear state. Also to create temporary render target textures.
         // When empty this render pass will render to the active camera render target.
@@ -59,7 +70,7 @@ public class PostprocessFogRenderPassFeature : ScriptableRendererFeature
         }
 
         #region 执行
-        
+
         // Here you can implement the rendering logic.
         // Use <c>ScriptableRenderContext</c> to issue drawing commands or execute command buffers
         // https://docs.unity3d.com/ScriptReference/Rendering.ScriptableRenderContext.html
@@ -72,14 +83,29 @@ public class PostprocessFogRenderPassFeature : ScriptableRendererFeature
                 return;
             }
             
+            //传入volume
+            var stack = VolumeManager.instance.stack;
+            //获取我们的volume
+            _postProcessVolume = stack.GetComponent<PostprecessFogVolume>();
+            if (_postProcessVolume == null)
+            {
+                Debug.LogError("Volume组件获取失败");
+                return;
+            }
+            //判断Volume是否开启
+            if (!_postProcessVolume.IsActive())
+            {
+                return;
+            }
+
             var cmd = CommandBufferPool.Get(RenderTag);       //设置渲染标签
             Render(cmd, ref renderingData);                                     //设置渲染函数
             context.ExecuteCommandBuffer(cmd);                                  //执行函数
             CommandBufferPool.Release(cmd);                                     //释放
         }
-        
+
         #endregion
-        
+
         #region 渲染
 
         void Render(CommandBuffer cmd, ref RenderingData renderingData)
@@ -88,25 +114,25 @@ public class PostprocessFogRenderPassFeature : ScriptableRendererFeature
             // _postProcessMat.SetInt("_RefValue", _postProcessVolume.stencilRefValue.value);
             // _postProcessMat.SetFloat("_Desaturate", _postProcessVolume.desaturate.value);
             // _postProcessMat.SetInt("_StencilComp", (int)_postProcessVolume.stencilCompare.value);
-            
+
             ref var cameraData = ref renderingData.cameraData;
             var camera = cameraData.camera;
             Matrix4x4 M_V = camera.cameraToWorldMatrix;
             // Vector4 cameraWP = new Vector4(M_V.m30,M_V.m31,M_V.m32,M_V.m33);
-            Vector4 cameraWP = new Vector4(M_V.m03,M_V.m13,M_V.m23,M_V.m33);
+            Vector4 cameraWP = new Vector4(M_V.m03, M_V.m13, M_V.m23, M_V.m33);
             // Debug.Log(cameraWP);
-            
+
             _postProcessMat.SetVector("_CameraPositionWS", cameraWP);
-            
+
             // cmd.SetViewProjectionMatrices(camera.worldToCameraMatrix, camera.projectionMatrix);
             cmd.SetViewProjectionMatrices(Matrix4x4.identity, Matrix4x4.identity);
-            cmd.DrawMesh(RenderingUtils.fullscreenMesh, Matrix4x4.identity, _postProcessMat, 0, 0);
+            cmd.DrawMesh(RenderingUtils.fullscreenMesh, Matrix4x4.identity, _postProcessMat, 0, 0, _materialPropertyBlock);
             // cmd.Blit(null, _currentTarget, _postProcessMat, 0);
             cmd.SetViewProjectionMatrices(camera.worldToCameraMatrix, camera.projectionMatrix);
         }
 
         #endregion
-        
+
         // Cleanup any allocated resources that were created during the execution of this render pass.
         public override void OnCameraCleanup(CommandBuffer cmd)
         {
@@ -114,6 +140,7 @@ public class PostprocessFogRenderPassFeature : ScriptableRendererFeature
     }
 
     PostprocessFogRenderPass m_ScriptablePass;
+
     /// <inheritdoc/>
     public override void Create()
     {
@@ -125,9 +152,20 @@ public class PostprocessFogRenderPassFeature : ScriptableRendererFeature
     // This method is called when setting up the renderer once per-camera.
     public override void AddRenderPasses(ScriptableRenderer renderer, ref RenderingData renderingData)
     {
+        //此效果只对Scene场景和带MainCamera标签的相机起作用
+        if (renderingData.cameraData.cameraType != CameraType.SceneView &&
+            !renderingData.cameraData.camera.CompareTag("MainCamera"))
+        {
+            return;
+        }
+
+        if (renderingData.cameraData.cameraType == CameraType.SceneView &&
+            settings.EnableInEditMode != true)
+        {
+            return;
+        }
+
         m_ScriptablePass.Setup(renderer.cameraColorTarget);
         renderer.EnqueuePass(m_ScriptablePass);
     }
 }
-
-
