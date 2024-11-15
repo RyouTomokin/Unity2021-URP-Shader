@@ -1,0 +1,58 @@
+#pragma kernel CSMain
+
+RWStructuredBuffer<float> cubes;
+uint cubeCount;
+
+// 比较两个元素并根据排序方向交换它们
+void BitonicCompareAndSwap(int i, int j, bool ascending)
+{
+    float temp;
+    if ((cubes[i] > cubes[j]) == ascending)
+    {
+        temp = cubes[i];
+        cubes[i] = cubes[j];
+        cubes[j] = temp;
+    }
+}
+
+[numthreads(32, 1, 1)]
+void CSMain (uint3 id : SV_DispatchThreadID)
+{
+    uint idx = id.x;
+
+    for(uint k = 2; k <= cubeCount; k *= 2)
+    {
+        // 每次执行两次操作
+        for (uint j = k / 2; j > 0; j /= 2)
+        {
+            // // 对数组进行双调排序的核心逻辑
+            // bool ascending = (idx & k) == 0;  // 判断升序还是降序
+            // uint i = idx & ~(j - 1);  // 计算当前的块索引
+            // uint jndex = i + j - 1;
+            //
+            // // 如果 i 和 j 在同一块中进行比较
+            // if (i < cubeCount && jndex < cubeCount && i < jndex)
+            // {
+            //     BitonicCompareAndSwap(i, jndex, ascending);
+            // }
+
+
+            // uint idx = i;
+            const uint l = idx ^ j;
+            if(l > j)
+            {
+                if(((idx & k) == 0 && (cubes[idx] > cubes[l])) ||  ((idx & k) != 0 && (cubes[idx] < cubes[l]))  )
+                {
+                    float temp = cubes[idx];
+                    cubes[idx] = cubes[l];
+                    cubes[l] = temp;
+                }
+            }
+            // for(uint i = 0; i<cubeCount;i++)
+            // {
+            //     
+            // }
+            
+        }
+    }
+}

@@ -1,0 +1,106 @@
+#pragma kernel CSMain
+#define GROUP_SIZE 256
+
+#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+
+struct Boid
+{
+    float3 position;
+    float3 direction;
+};
+
+RWStructuredBuffer<Boid> boids;
+
+float deltaTime;
+float targetForce;
+float maxVelocity;
+float maxAcceleration;
+float3 targetPos;
+
+CBUFFER_START(Params)
+    float DeltaTime;
+    float RotationSpeed;            //个体旋转速度
+    float BoidSpeed;                //个体的速度
+    float BoidSpeedVariation;
+    float3 FlockPosition;           //TargetPosition目标方向
+    float NeighbourDistance;        //判定为相邻的范围
+    int BoidsCount;
+CBUFFER_END
+
+float rand(float2 co)
+{
+    return (frac(sin(dot(co.xy, float2(12.9898, 78.233))) * 43758.5453)) * 1;
+}
+
+float3 rand(float3 pos)
+{
+    return  float3(
+        rand(float2(pos.x, pos.y)),
+        rand(float2(pos.y, pos.z)),
+        rand(float2(pos.z, pos.x))
+    ) * 2 - 1;
+}
+
+float3 normalizeSafe(float3 v)
+{
+    return length(v) > 0 ? normalize(v) : 0;
+}
+
+float3 ClampLen(float3 value, float maxValue)
+{
+    float len = length(value);
+    len = min(maxValue, len);
+    return normalizeSafe(value) * len;
+}
+
+[numthreads(GROUP_SIZE,1,1)]
+void CSMain (uint3 id : SV_DispatchThreadID)
+{
+    Boid boid = boids[id.x];
+    //TODO: 计算新的位置和速度
+    // float velocity = BoidSpeed * (1.0 + noise * BoidSpeedVariation);
+    float velocity = BoidSpeed;
+
+    //在逻辑上将其缓存在一个变量中，但有时再次访问它而不缓存它会更有效
+    // float3 pos = boid.position;
+    // float3 rot = boid.direction;
+
+    float3 separation = float3(0.0, 0.0, 0.0);
+    float3 alignment = float3(0.0, 0.0, 0.0);
+    float3 cohesion = FlockPosition;
+
+    uint nearbyCount = 1;
+
+    for(int i = 0; i < BoidsCount; i++)
+    {
+        if(i != int(id.x))
+        {
+            Boid tempBoid = boids[i];
+            if(distance(boid.position, tempBoid.position) < NeighbourDistance)
+            {
+                float3 diff = boid.position - tempBoid.position;
+                float diffLen = length(diff);
+                float scaler = clamp(1.0 - diffLen / NeighbourDistance, 0.0, 1.0);
+                separation += diff * (scaler / diffLen);        //分离：距离因子乘方向(距离因子越近值越大)
+
+                alignment += tempBoid.direction;                //对齐：朝向平均方向移动
+                cohesion += tempBoid.position;                  //内聚：目标方向
+                nearbyCount++;
+            }
+        }
+    }
+
+    float avg = 1.0 / nearbyCount;
+    alignment *= avg;
+    cohesion  *= avg;
+    cohesion = normalize(cohesion - boid.position);             //内聚的方向
+
+    float3 direction = alignment + separation + cohesion;
+
+    float ip = exp(-RotationSpeed * DeltaTime);                 //旋转速度，速度越大，ip越小，且大于1
+    boid.direction = lerp(direction, normalize(boid.direction), ip);    //ip越小则越倾向新计算的方向
+    
+    boid.position += boid.direction * (velocity * DeltaTime);
+    
+    boids[id.x] = boid;
+}

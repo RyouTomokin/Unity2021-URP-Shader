@@ -110,11 +110,6 @@ public class PostprocessFogRenderPassFeature : ScriptableRendererFeature
 
         void Render(CommandBuffer cmd, ref RenderingData renderingData)
         {
-            // //从Volume获取参数并设置到材质中
-            // _postProcessMat.SetInt("_RefValue", _postProcessVolume.stencilRefValue.value);
-            // _postProcessMat.SetFloat("_Desaturate", _postProcessVolume.desaturate.value);
-            // _postProcessMat.SetInt("_StencilComp", (int)_postProcessVolume.stencilCompare.value);
-
             ref var cameraData = ref renderingData.cameraData;
             var camera = cameraData.camera;
             Matrix4x4 M_V = camera.cameraToWorldMatrix;
