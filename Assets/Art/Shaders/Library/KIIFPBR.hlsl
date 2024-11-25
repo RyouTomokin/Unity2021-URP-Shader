@@ -4,6 +4,7 @@
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
 
+
 struct Attributes
 {
     float4 positionOS   : POSITION;
@@ -54,12 +55,33 @@ half _Smoothness;
 half _Metallic;
 half _OcclusionStrength;
 half4 _EmissionColor;
-half _EmissionStrength;            
+half _EmissionStrength;
+
+float _MetalEmissionStrength;
+float _FresnelEmissionStrength;
+float _TextureEmissionStrength;
+float _EmissionFlashSequence;
+
+float4 _SnowMap_ST;
+half4 _SnowColor;
+half _SnowIntensity;
+half _SnowRange_Alpha;
+half _SnowRange;
+half _SnowPower;
+half _SnowSmoothness;
+half _SnowMetallic;
+
+half4 _RampColor;
+half _RampBottom;
+half _RampLength;
 CBUFFER_END
 
 TEXTURE2D(_BaseMap);            SAMPLER(sampler_BaseMap);
 TEXTURE2D(_BumpMap);            SAMPLER(sampler_BumpMap);
 TEXTURE2D(_SMAEMap);            SAMPLER(sampler_SMAEMap);
+
+TEXTURE2D(_SnowMap);            SAMPLER(sampler_SnowMap);
+TEXTURE2D(_SnowNormalMap);      SAMPLER(sampler_SnowNormalMap);
 
 Varyings vert(Attributes input)
 {
@@ -251,6 +273,46 @@ inline half3 GetGIColorNPR(Varyings input, Light mainLight, BRDFData brdfData, P
     GIcolor = lerp(brdfData.diffuse * Desaturate(bakedGI,0.0), GIcolor, 0.3);
 
     return GIcolor;
+}
+
+inline half3 GetEmission(PBRData pbrData)
+{
+    //金属发光
+    half3 metalEmission = pbrData.albedo * pbrData.metallic * _MetalEmissionStrength;
+    //描边发光
+    half3 fresnelEmission = Pow4(1 - dot(pbrData.normalWS, pbrData.viewDirectionWS))
+        * _FresnelEmissionStrength;
+    //贴图通道发光
+    //pbrData.emissionColor
+    //自发光
+    half3 allEmission = pbrData.emissionColor * _TextureEmissionStrength +
+        (metalEmission + fresnelEmission) * _EmissionColor.rgb * _EmissionStrength;
+
+    allEmission *= _EmissionFlashSequence > 0 ?
+    (cos(_Time.y / _EmissionFlashSequence) + 1) * 0.5 : 1;
+
+    return allEmission;
+}
+
+
+half4 SampleAlbedoAlpha(float2 uv, TEXTURE2D_PARAM(albedoAlphaMap, sampler_albedoAlphaMap))
+{
+    return half4(SAMPLE_TEXTURE2D(albedoAlphaMap, sampler_albedoAlphaMap, uv));
+}
+
+half Alpha(half albedoAlpha, half4 color, half cutoff)
+{
+    #if !defined(_SMOOTHNESS_TEXTURE_ALBEDO_CHANNEL_A) && !defined(_GLOSSINESS_FROM_BASE_ALPHA)
+    half alpha = albedoAlpha * color.a;
+    #else
+    half alpha = color.a;
+#endif
+
+#if defined(_ALPHATEST_ON)
+clip(alpha - cutoff);
+#endif
+
+return alpha;
 }
 
 #endif

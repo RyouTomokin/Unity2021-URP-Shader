@@ -81,21 +81,21 @@
 
             // -------------------------------------
             // Material Keywords
-            #pragma shader_feature _ALPHATEST_ON
-            #pragma shader_feature _NORMALMAP
-            #pragma shader_feature _SMAEMAP
-            #pragma shader_feature _COLORRAMP_ON
-            #pragma shader_feature _SNOW_ON
-            #pragma shader_feature _SNOWMAP
-            #pragma shader_feature _SNOWRANGE_ALBEDO_CHANNEL_A
-            #pragma shader_feature _SNOWNORMALMAP
+            #pragma shader_feature_local_fragment  _ALPHATEST_ON
+            #pragma shader_feature_local _NORMALMAP
+            #pragma shader_feature_local_fragment  _SMAEMAP
+            #pragma shader_feature_local_fragment  _COLORRAMP_ON
+            #pragma shader_feature_local_fragment  _SNOW_ON
+            #pragma shader_feature_local_fragment  _SNOWMAP
+            // #pragma shader_feature_local_fragment  _SNOWRANGE_ALBEDO_CHANNEL_A
+            #pragma shader_feature_local_fragment  _SNOWNORMALMAP
 
             // -------------------------------------
             // Universal Pipeline keywords
             #pragma multi_compile _ _MAIN_LIGHT_SHADOWS
             #pragma multi_compile _ _MAIN_LIGHT_SHADOWS_CASCADE
             #pragma multi_compile _ _ADDITIONAL_LIGHTS_VERTEX _ADDITIONAL_LIGHTS
-            #pragma multi_compile _ _ADDITIONAL_LIGHT_SHADOWS
+            // #pragma multi_compile _ _ADDITIONAL_LIGHT_SHADOWS
             #pragma multi_compile _ _SHADOWS_SOFT
             #pragma multi_compile _ _MIXED_LIGHTING_SUBTRACTIVE
 
@@ -103,7 +103,7 @@
             // Unity defined keywords
             #pragma multi_compile _ DIRLIGHTMAP_COMBINED
             #pragma multi_compile _ LIGHTMAP_ON
-            #pragma multi_compile_fog
+            // #pragma multi_compile_fog
 
             //--------------------------------------
             // GPU Instancing
@@ -117,12 +117,6 @@
             #include "Assets/Art/Shaders/Library/KIIFPBR.hlsl"
             #include "Assets/Art/Shaders/Library/SnowFunction.hlsl"
             #include "Assets/Art/Shaders/Library/ColorRampFunction.hlsl"
-
-            float _MetalEmissionStrength;
-            float _FresnelEmissionStrength;
-            float _TextureEmissionStrength;
-            float _EmissionFlashSequence;
-            
 
             half4 frag(Varyings input) : SV_Target
             {
@@ -167,21 +161,10 @@
 
                 ColorRampFunction(pbrData.positionWS, color);
                 // -------------------------------------
-                //金属发光
-                half3 metalEmission = pbrData.albedo * pbrData.metallic * _MetalEmissionStrength;
-                //描边发光
-                half3 fresnelEmission = Pow4(1 - dot(pbrData.normalWS, pbrData.viewDirectionWS))
-                    * _FresnelEmissionStrength;
-                //贴图通道发光
-                //pbrData.emissionColor
-                //自发光
-                half3 allEmission = pbrData.emissionColor * _TextureEmissionStrength +
-                    (metalEmission + fresnelEmission) * _EmissionColor.rgb * _EmissionStrength;
-
-                allEmission *= _EmissionFlashSequence > 0 ?
-                (cos(_Time.y / _EmissionFlashSequence) + 1) * 0.5 : 1;
                 
-                color.rgb += allEmission;
+                
+                // color.rgb += allEmission;
+                color.rgb += GetEmission(pbrData);
                 // color.rgb = MixFog(color.rgb, fogCoord);
                 return color;
             }
@@ -215,8 +198,54 @@
             #pragma vertex ShadowPassVertex
             #pragma fragment ShadowPassFragment
 
-            #include "Packages/com.unity.render-pipelines.universal/Shaders/LitInput.hlsl"
-            #include "Packages/com.unity.render-pipelines.universal/Shaders/ShadowCasterPass.hlsl"
+            // #include "Packages/com.unity.render-pipelines.universal/Shaders/LitInput.hlsl"
+            #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Common.hlsl"
+
+            // #include "Packages/com.unity.render-pipelines.universal/Shaders/ShadowCasterPass.hlsl"
+            #include "Assets/Art/Shaders/Library/KIIFPBR.hlsl"
+
+            float3 _LightDirection;
+            float3 _LightPosition;
+
+            float4 GetShadowPositionHClip(Attributes input)
+            {
+                float3 positionWS = TransformObjectToWorld(input.positionOS.xyz);
+                float3 normalWS = TransformObjectToWorldNormal(input.normalOS);
+
+                Light mainLight = GetMainLight();
+
+            #if _CASTING_PUNCTUAL_LIGHT_SHADOW
+                float3 lightDirectionWS = normalize(_LightPosition - positionWS);
+            #else
+                float3 lightDirectionWS = _LightDirection;
+            #endif
+
+                float4 positionCS = TransformWorldToHClip(ApplyShadowBias(positionWS, normalWS, lightDirectionWS));
+
+            #if UNITY_REVERSED_Z
+                positionCS.z = min(positionCS.z, UNITY_NEAR_CLIP_VALUE);
+            #else
+                positionCS.z = max(positionCS.z, UNITY_NEAR_CLIP_VALUE);
+            #endif
+
+                return positionCS;
+            }
+
+            Varyings ShadowPassVertex(Attributes input)
+            {
+                Varyings output = (Varyings)0;
+                UNITY_SETUP_INSTANCE_ID(input);
+
+                output.uv = TRANSFORM_TEX(input.texcoord, _BaseMap);
+                output.positionCS = GetShadowPositionHClip(input);
+                return output;
+            }
+
+            half4 ShadowPassFragment(Varyings input) : SV_TARGET
+            {
+                Alpha(SampleAlbedoAlpha(input.uv, TEXTURE2D_ARGS(_BaseMap, sampler_BaseMap)).a, _BaseColor, _Cutoff);
+                return 0;
+            }
             ENDHLSL
         }
         //DepthOnly
@@ -247,8 +276,29 @@
             // GPU Instancing
             #pragma multi_compile_instancing
 
-            #include "Packages/com.unity.render-pipelines.universal/Shaders/LitInput.hlsl"
-            #include "Packages/com.unity.render-pipelines.universal/Shaders/DepthOnlyPass.hlsl"
+            // #include "Packages/com.unity.render-pipelines.universal/Shaders/LitInput.hlsl"
+            // #include "Packages/com.unity.render-pipelines.universal/Shaders/DepthOnlyPass.hlsl"
+            #include "Assets/Art/Shaders/Library/KIIFPBR.hlsl"
+
+            Varyings DepthOnlyVertex(Attributes input)
+            {
+                Varyings output = (Varyings)0;
+                UNITY_SETUP_INSTANCE_ID(input);
+                UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(output);
+
+                output.uv = TRANSFORM_TEX(input.texcoord, _BaseMap);
+                output.positionCS = TransformObjectToHClip(input.positionOS.xyz);
+                return output;
+            }
+
+
+            half4 DepthOnlyFragment(Varyings input) : SV_TARGET
+            {
+                UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(input);
+
+                Alpha(SampleAlbedoAlpha(input.uv, TEXTURE2D_ARGS(_BaseMap, sampler_BaseMap)).a, _BaseColor, _Cutoff);
+                return 0;
+            }
             ENDHLSL
         }
         // This pass it not used during regular rendering, only for lightmap baking.

@@ -2,10 +2,7 @@
 #define KIIF_ColorRampFunction_INCLUDED
 
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
-
-half4 _RampColor;
-half _RampBottom;
-half _RampLength;
+#include "Assets/Art/Shaders/Library/KIIFPBR.hlsl"
 
 inline void ColorRampFunction(half3 positionWS, inout half4 color)
 {

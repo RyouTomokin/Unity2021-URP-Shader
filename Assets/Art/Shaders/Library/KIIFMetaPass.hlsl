@@ -13,7 +13,25 @@ half _Smoothness;
 half _Metallic;
 half _OcclusionStrength;
 half4 _EmissionColor;
-half _EmissionStrength;    
+half _EmissionStrength;
+
+float _MetalEmissionStrength;
+float _FresnelEmissionStrength;
+float _TextureEmissionStrength;
+float _EmissionFlashSequence;
+
+float4 _SnowMap_ST;
+half4 _SnowColor;
+half _SnowIntensity;
+half _SnowRange_Alpha;
+half _SnowRange;
+half _SnowPower;
+half _SnowSmoothness;
+half _SnowMetallic;
+
+half4 _RampColor;
+half _RampBottom;
+half _RampLength;
 CBUFFER_END
 TEXTURE2D(_BaseMap);            SAMPLER(sampler_BaseMap);
 TEXTURE2D(_SMAEMap);            SAMPLER(sampler_SMAEMap);
