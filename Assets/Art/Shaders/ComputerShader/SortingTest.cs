@@ -42,17 +42,24 @@ public class SortingTest : MonoBehaviour
         objects.Add(cube);
 
         data[x] = (float)(x + 1) / count;
-    }
-
-    private void OnEnable()
-    {
+        
         // 创建Buffer
         _cubeBuffer =
             new GraphicsBuffer(GraphicsBuffer.Target.Structured, count, Marshal.SizeOf<float>());
-        
-        
     }
 
+    public void OnClearCubes()
+    {
+        for (int x = 0; x < objects.Count; x++)
+        {
+            Destroy(objects[x]);
+        }
+        objects.Clear();
+        objects = null;
+        data = null;
+        _cubeBuffer.Dispose();
+    }
+    
     private void OnDisable()
     {
         _cubeBuffer.Dispose();
@@ -61,28 +68,63 @@ public class SortingTest : MonoBehaviour
     public void OnRandomizeCubes()
     {
         List<int> randSort = new List<int>();
-        for (int i = 0; i < count; i++)
+        int dataCount = data.Length;
+        for (int i = 0; i < dataCount; i++)
         {
             randSort.Add(i);
         }
 
-        for (int i = 0; i < count; i++)
+        for (int i = 0; i < dataCount; i++)
         {
-            int temp = Random.Range(0, (count - i));
-            data[i] = (float)randSort[temp] / count;
+            int temp = Random.Range(0, (dataCount - i));
+            data[i] = (float)randSort[temp] / dataCount;
             objects[i].transform.position = new Vector3(data[i], 0, 0);
             randSort.Remove(randSort[temp]);
         }
     }
 
+    //All in GPU,排序数超于32会排序出错
     public void OnSortCubes()
     {
         _cubeBuffer.SetData(data);
         computeShader.SetBuffer(0, "cubes", _cubeBuffer);
         computeShader.SetInt("cubeCount", count);
         computeShader.GetKernelThreadGroupSizes(0, out var x, out var y, out var z);
-        computeShader.Dispatch(0, 1,1,1);
         
+        int Gx = Mathf.CeilToInt(count / (float)x);
+        computeShader.Dispatch(0, Gx,1,1);
+        
+        _cubeBuffer.GetData(data);
+        
+        for (int i = 0; i < objects.Count; i++)
+        {
+            GameObject obj = objects[i];
+            obj.transform.position = new Vector3(data[i], 0, 0);
+        }
+    }
+    public void OnSortCubesCPU()
+    {
+        _cubeBuffer.SetData(data);
+        int dataCount = data.Length;
+        
+        int kernel = computeShader.FindKernel("CSMain2");
+        computeShader.SetBuffer(kernel, "cubes", _cubeBuffer);
+        computeShader.SetInt("cubeCount", dataCount);
+        computeShader.GetKernelThreadGroupSizes(kernel, out var x, out var y, out var z);
+        
+        int Gx = Mathf.CeilToInt(dataCount / (float)x);
+
+        // 在CPU中计算循环的批次，然后统一给GPU进行一次比较和替换
+        for (uint k = 2; k <= dataCount; k *= 2)
+        {
+            for (uint j = k / 2; j > 0; j /= 2)
+            {
+                computeShader.SetInt("bitonicK", (int)k);
+                computeShader.SetInt("bitonicJ", (int)j);
+                computeShader.Dispatch(kernel, Gx,1,1);
+            }
+        }
+
         _cubeBuffer.GetData(data);
         
         for (int i = 0; i < objects.Count; i++)
@@ -109,7 +151,11 @@ public class SortingTest : MonoBehaviour
             }
             if (GUI.Button(new Rect(100, 100, 100, 50), "SortCubes"))
             {
-                OnSortCubes();
+                OnSortCubesCPU();
+            }
+            if (GUI.Button(new Rect(0, 200, 100, 50), "ClearCubes"))
+            {
+                OnClearCubes();
             }
         }
     }
