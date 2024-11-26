@@ -11,12 +11,6 @@ struct Boid
 
 RWStructuredBuffer<Boid> boids;
 
-float deltaTime;
-float targetForce;
-float maxVelocity;
-float maxAcceleration;
-float3 targetPos;
-
 CBUFFER_START(Params)
     float DeltaTime;
     float RotationSpeed;            //个体旋转速度
@@ -56,6 +50,7 @@ float3 ClampLen(float3 value, float maxValue)
 [numthreads(GROUP_SIZE,1,1)]
 void CSMain (uint3 id : SV_DispatchThreadID)
 {
+    if(id.x >= BoidsCount) return;
     Boid boid = boids[id.x];
     //TODO: 计算新的位置和速度
     // float velocity = BoidSpeed * (1.0 + noise * BoidSpeedVariation);

@@ -150,3 +150,4 @@ MonoBehaviour:
   settings:
     renderPassEvent: 500
     materia: {fileID: 2100000, guid: 28b272c4700bc8e4f9a4bb9d3be98ffa, type: 2}
+    EnableInEditMode: 0
