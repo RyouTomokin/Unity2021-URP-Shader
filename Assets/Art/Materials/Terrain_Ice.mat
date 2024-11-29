@@ -1,0 +1,217 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!21 &2100000
+Material:
+  serializedVersion: 8
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: Terrain_Ice
+  m_Shader: {fileID: 4800000, guid: c09448c4d728020499e2ce0568f0ead7, type: 3}
+  m_ValidKeywords:
+  - _NOISEMAP
+  - _NORMALMAP
+  - _SECONDARY_COLORMAP
+  - _SECONDARY_NORMALMAP
+  - _SECONDARY_ON
+  - _SMAEMAP
+  m_InvalidKeywords:
+  - _Splat1_Height
+  - _Splat2_Height
+  - _UseBlend
+  m_LightmapFlags: 2
+  m_EnableInstancingVariants: 0
+  m_DoubleSidedGI: 0
+  m_CustomRenderQueue: 2000
+  stringTagMap: {}
+  disabledShaderPasses: []
+  m_SavedProperties:
+    serializedVersion: 3
+    m_TexEnvs:
+    - _AddTex:
+        m_Texture: {fileID: 2800000, guid: 91717c5a2e39a8646ba6b64ea402fd8d, type: 3}
+        m_Scale: {x: 4, y: 4}
+        m_Offset: {x: 0, y: 0}
+    - _BaseMap:
+        m_Texture: {fileID: 2800000, guid: 991dcf20c7f13b049a0298615c813646, type: 3}
+        m_Scale: {x: 4, y: 4}
+        m_Offset: {x: 0, y: 0}
+    - _BumpMap:
+        m_Texture: {fileID: 2800000, guid: 17b53f65da1bb3048b20bd2782f39e42, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _ClipTex:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 2, y: 2}
+        m_Offset: {x: 0, y: 0}
+    - _Control:
+        m_Texture: {fileID: 2800000, guid: 44ce6c90e8c369b45907d49435d3941c, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _EmissionMap:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _HeightTex:
+        m_Texture: {fileID: 2800000, guid: db4c1270de4a8c848aabf11ba1e41bc1, type: 3}
+        m_Scale: {x: 4, y: 4}
+        m_Offset: {x: 0, y: 0}
+    - _MainTex:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 2, y: 4}
+        m_Offset: {x: 0, y: 0}
+    - _MetallicGlossMap:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _NoiseMap:
+        m_Texture: {fileID: 2800000, guid: a9ecf6184bbbb7c4791550093f8b1979, type: 3}
+        m_Scale: {x: 0.25, y: 0.25}
+        m_Offset: {x: 0, y: 0}
+    - _Normal:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 2, y: 2}
+        m_Offset: {x: 0, y: 0}
+    - _OcclusionMap:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _SMAEMap:
+        m_Texture: {fileID: 2800000, guid: 38e64980c332ba34dbc0d3fad4a3f56c, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _SecondaryBumpMap:
+        m_Texture: {fileID: 2800000, guid: 1f4f69a2dac9b5249a424ca02fe951b7, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _SecondaryMap:
+        m_Texture: {fileID: 2800000, guid: 58398e7e44b4c8941a57cb680785fc87, type: 3}
+        m_Scale: {x: 6, y: 6}
+        m_Offset: {x: 0, y: 0}
+    - _SecondarySMAEMap:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _SnowNormal:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 5, y: 5}
+        m_Offset: {x: 0, y: 0}
+    - _SnowTex:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 5, y: 5}
+        m_Offset: {x: 0, y: 0}
+    - _SpecGlossMap:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _Splat1:
+        m_Texture: {fileID: 2800000, guid: 14a8f5dccb6c2fb4ebff3b35b695a9dc, type: 3}
+        m_Scale: {x: 4, y: 4}
+        m_Offset: {x: 0, y: 0}
+    - _Splat1N:
+        m_Texture: {fileID: 2800000, guid: 0fe72e1b1b0304f42b4b8cc70a934cff, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _Splat2:
+        m_Texture: {fileID: 2800000, guid: b03bf821051c7754c9c4e945d996485b, type: 3}
+        m_Scale: {x: 6, y: 6}
+        m_Offset: {x: 0, y: 0}
+    - _Splat2N:
+        m_Texture: {fileID: 2800000, guid: 53d5556e0314ab14481e47258a604da5, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    m_Ints: []
+    m_Floats:
+    - _Accuracy: 53
+    - _AddRange: -0.49
+    - _AlphaClip: 0
+    - _AlphaTest: 0
+    - _Blend: 1
+    - _BlendSwitch: 1
+    - _BumpScale: 0.5
+    - _Clip: 0.474
+    - _Cull: 2
+    - _Cutoff: 0.5
+    - _DstBlend: 10
+    - _EmissionStrength: 0.5
+    - _EnvironmentReflections: 1
+    - _FresnelBias: 0.14
+    - _FresnelPower: 2
+    - _FresnelScale: 1.12
+    - _GlossMapScale: 0
+    - _Glossiness: 0
+    - _GlossyReflections: 0
+    - _HeightAmount: 0.42
+    - _MaskContrast: 2.89
+    - _Metallic: 0.5
+    - _Metallic1: 0.109
+    - _Metallic2: 0
+    - _NoiseContrast: 0
+    - _NoiseStrength: 0
+    - _NormalScale: 0.15
+    - _Occlusion: 1
+    - _OcclusionStrength: 1
+    - _Parallax: 0.11
+    - _QueueOffset: 0
+    - _ReceiveShadows: 1
+    - _RefValue: 0
+    - _Secondary: 1
+    - _SecondaryBumpScale: 0.1
+    - _ShadowCullMode: 2
+    - _SiphonBottom: 0
+    - _SiphonTop: 0
+    - _SiphonTopLerp: 1
+    - _Smooth1: 0.513
+    - _Smooth2: 0
+    - _SmoothAll: 0.971
+    - _SmoothBlend: 0
+    - _Smoothness: 1
+    - _SmoothnessTextureChannel: 0
+    - _SnowIntensity: 0.532
+    - _SnowLevel: 0
+    - _SnowNormalScale: 1
+    - _SnowRange: 5
+    - _SpecularHighlights: 1
+    - _Splat1NScale: 0.15
+    - _Splat1_Height: 1
+    - _Splat2NScale: 0.5
+    - _Splat2_Height: 1
+    - _SrcBlend: 5
+    - _StencilComp: 8
+    - _StencilPass: 0
+    - _Surface: 0
+    - _UseClip: 0
+    - _UseSiphon: 0
+    - _UseSnowNormal: 0
+    - _UseWeight: 0
+    - _Weight: 0.137
+    - _WorkflowMode: 1
+    - _ZWrite: 1
+    m_Colors:
+    - _AddColor: {r: 0.6320754, g: 0.6320754, b: 0.6320754, a: 1}
+    - _BaseColor: {r: 1, g: 1, b: 1, a: 1}
+    - _Color: {r: 1, g: 1, b: 1, a: 1}
+    - _ColorAll: {r: 0.69068176, g: 0.7172484, b: 0.7830189, a: 0}
+    - _ColorTint: {r: 0.6132076, g: 0.8393828, b: 1, a: 1}
+    - _Color_Splat1: {r: 0.5877271, g: 0.7321635, b: 0.8899868, a: 1}
+    - _Color_Splat2: {r: 0.8503916, g: 0.85579324, b: 0.8584906, a: 0}
+    - _EmissionColor: {r: 0, g: 0.5393634, b: 1, a: 1}
+    - _SecondaryColor: {r: 1, g: 1, b: 1, a: 1}
+    - _SiphonColor: {r: 1, g: 1, b: 1, a: 1}
+    - _SnowColorTint: {r: 1, g: 1, b: 1, a: 1}
+    - _SpecColor: {r: 0.2, g: 0.2, b: 0.2, a: 1}
+  m_BuildTextureStacks: []
+--- !u!114 &268916968433775242
+MonoBehaviour:
+  m_ObjectHideFlags: 11
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d0353a89b1f911e48b9e16bdc9f2e058, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  version: 1
