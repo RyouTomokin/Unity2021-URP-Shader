@@ -12,6 +12,7 @@ Material:
   m_ValidKeywords:
   - _NOISEMAP
   - _NORMALMAP
+  - _PARALLAX_ON
   - _SECONDARY_COLORMAP
   - _SECONDARY_NORMALMAP
   - _SECONDARY_ON
@@ -51,6 +52,10 @@ Material:
         m_Offset: {x: 0, y: 0}
     - _EmissionMap:
         m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _HeightMap:
+        m_Texture: {fileID: 2800000, guid: c035913cc06be934ca14fe77f4199c10, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _HeightTex:
@@ -134,7 +139,7 @@ Material:
     - _Cull: 2
     - _Cutoff: 0.5
     - _DstBlend: 10
-    - _EmissionStrength: 0.5
+    - _EmissionStrength: 1
     - _EnvironmentReflections: 1
     - _FresnelBias: 0.14
     - _FresnelPower: 2
@@ -143,6 +148,7 @@ Material:
     - _Glossiness: 0
     - _GlossyReflections: 0
     - _HeightAmount: 0.42
+    - _HeightScale: 0.05
     - _MaskContrast: 2.89
     - _Metallic: 0.5
     - _Metallic1: 0.109
@@ -158,6 +164,7 @@ Material:
     - _RefValue: 0
     - _Secondary: 1
     - _SecondaryBumpScale: 0.1
+    - _Secondary_Parallax: 0
     - _ShadowCullMode: 2
     - _SiphonBottom: 0
     - _SiphonTop: 0
@@ -166,7 +173,7 @@ Material:
     - _Smooth2: 0
     - _SmoothAll: 0.971
     - _SmoothBlend: 0
-    - _Smoothness: 1
+    - _Smoothness: 0.3
     - _SmoothnessTextureChannel: 0
     - _SnowIntensity: 0.532
     - _SnowLevel: 0

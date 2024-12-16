@@ -22,7 +22,7 @@ struct Varyings
 
     float3 positionWS               : TEXCOORD2;
 
-    #ifdef _NORMALMAP
+    #if defined(_NORMALMAP) || defined(_PARALLAX_ON)
     float4 normalWS                 : TEXCOORD3;    // xyz: normal, w: viewDir.x
     float4 tangentWS                : TEXCOORD4;    // xyz: tangent, w: viewDir.y
     float4 bitangentWS              : TEXCOORD5;    // xyz: bitangent, w: viewDir.z
@@ -99,7 +99,7 @@ Varyings vert(Attributes input)
 
     output.uv = TRANSFORM_TEX(input.texcoord, _BaseMap);
 
-    #ifdef _NORMALMAP
+    #if defined(_NORMALMAP) || defined(_PARALLAX_ON)
     output.normalWS = half4(normalInput.normalWS, viewDirWS.x);
     output.tangentWS = half4(normalInput.tangentWS, viewDirWS.y);
     output.bitangentWS = half4(normalInput.bitangentWS, viewDirWS.z);

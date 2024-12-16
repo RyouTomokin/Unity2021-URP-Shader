@@ -16,16 +16,16 @@ TEXTURE2D(_SecondaryBumpMap);    SAMPLER(sampler_SecondaryBumpMap);
 TEXTURE2D(_SecondarySMAEMap);    SAMPLER(sampler_SecondarySMAEMap);
 TEXTURE2D(_NoiseMap);            SAMPLER(sampler_NoiseMap);
 
-inline void PBR_Secondary_Initialize(Varyings input, out PBRData out_data)
+inline void PBR_Secondary_Initialize(Varyings input, out PBRData out_data, float2 suv)
 {
     out_data = (PBRData)0;
     float2 uv = input.uv;
 
     // 噪波范围
-    #ifdef _SECONDARY_ON
     half Factor = 1;
+    #ifdef _SECONDARY_ON
     #ifdef _NOISEMAP
-    float2 noiseUV = TRANSFORM_TEX(uv, _NoiseMap);
+    float2 noiseUV = TRANSFORM_TEX(suv, _NoiseMap);
     Factor = 1 - SAMPLE_TEXTURE2D(_NoiseMap, sampler_NoiseMap, noiseUV).r;
     #endif
     Factor = saturate(Factor + _NoiseStrength);
@@ -38,7 +38,7 @@ inline void PBR_Secondary_Initialize(Varyings input, out PBRData out_data)
 
     // 细节颜色
     #ifdef _SECONDARY_ON
-    float2 suv = TRANSFORM_TEX(uv, _SecondaryMap);
+    suv = TRANSFORM_TEX(suv, _SecondaryMap);
     half4 sColor = half4(1,1,1,1);
     #ifdef _SECONDARY_COLORMAP
     sColor = SAMPLE_TEXTURE2D(_SecondaryMap, sampler_SecondaryMap, suv);
@@ -65,13 +65,16 @@ inline void PBR_Secondary_Initialize(Varyings input, out PBRData out_data)
     half4 sSMA = SAMPLE_TEXTURE2D(_SecondarySMAEMap, sampler_SecondarySMAEMap, suv);
     out_data.smoothness = lerp(out_data.smoothness, sSMA.r, Factor);
     out_data.metallic = lerp(out_data.metallic, sSMA.g, Factor);
+    out_data.occlusion = lerp(out_data.occlusion, lerp(1.0h, sSMA.b, _OcclusionStrength), Factor);
     #endif
+    out_data.emissionColor = lerp(out_data.emissionColor, 0, Factor);
     
     #else
     out_data.smoothness = _Smoothness;
     out_data.metallic = _Metallic;
     out_data.occlusion = 1.0h;
-    out_data.emissionColor = _EmissionColor.rgb * _EmissionStrength;
+    out_data.emissionColor = lerp(_EmissionColor.rgb, 0, Factor);
+    out_data.emissionColor *= _EmissionStrength;
     #endif
     
     out_data.positionWS = input.positionWS;
