@@ -28,6 +28,8 @@ public class MeshCutterEditor : EditorWindow
     private List<Color> colors;
     private float GL_Alpha = 0.2f;
 
+    private bool isBaked;
+
     private string _path
     {
         get => rootPath + levelPath + "/";
@@ -69,6 +71,8 @@ public class MeshCutterEditor : EditorWindow
         // Turn off depth writes
         GL_Material.SetInt("_ZWrite", 0);
         GL_Material.SetInt("_ZTest", 0);
+        
+        isBaked = false;
     }
 
     private HashSet<Action<SceneView>> _hash = new();
@@ -104,6 +108,7 @@ public class MeshCutterEditor : EditorWindow
         
         if (GUILayout.Button("应用切割好的模型"))
         {
+            // TODO 烘焙好的模型，应用的方法需要修改
             ApplyMeshSplit();
         }
         
@@ -157,11 +162,29 @@ public class MeshCutterEditor : EditorWindow
             return;
         }
 
+        // 如果模型已经应用，重新切割需要把应用的模型先删掉再重新应用
+        bool isApplied = false;
+        if (appliedObjects != null)
+        {
+            if (appliedObjects.Count > 0)
+            {
+                isApplied = true;
+                ReductionMeshSplit();
+            }
+        }
+
         subMeshes = new List<Mesh> { };
+        MeshCutterUtility.DeleteAssetsInDirectory(_path);
 
         MeshCutterUtility.SplitMeshToGrid(targetObject, originalMesh, ref subMeshes, splitSize, centerOffset);
 
         MeshCutterUtility.SaveMeshs(ref subMeshes, _path);
+
+        if (isApplied)
+        {
+            ApplyMeshSplit();
+            isApplied = false;
+        }
 
         Debug.Log("模型切割完成!");
     }
@@ -183,13 +206,17 @@ public class MeshCutterEditor : EditorWindow
             if (appliedObjects.Count > 0)
                 ReductionMeshSplit();
         }
-        MeshCutterUtility.CreatNewObjects(targetObject, ref subMeshes, out appliedObjects, _path);
+        MeshCutterUtility.CreatNewObjects(targetObject, ref subMeshes, out appliedObjects, _path, isBaked);
         targetObject.SetActive(false);
     }
     
     private void ReductionMeshSplit()
     {
         targetObject.SetActive(true);
+        if (appliedObjects == null)
+        {
+            return;
+        }
         foreach (var obj in appliedObjects)
         {
             DestroyImmediate(obj);
@@ -202,6 +229,7 @@ public class MeshCutterEditor : EditorWindow
         ReductionMeshSplit();
         subMeshes.Clear();
         MeshCutterUtility.DeleteAssetsInDirectory(_path);
+        isBaked = false;
     }
     
     // 重新映射UV，并把Mesh的UV修改
@@ -262,12 +290,15 @@ public class MeshCutterEditor : EditorWindow
             var mesh = subMeshes[i];
             float maxLength;
             Vector2 newO;
+            // TODO 记录UV的修改，创建一个类单独记录Mesh Objects UV偏移 组件的信息
             UV_Remapping(mesh, out maxLength, out newO);
             // TODO 烘焙颜色和法线贴图
             TerrainBakeMaterialGen(obj, terrainMaterial, newO, maxLength, resolution, _path);
             
             terrainMaterial.SetVector("_BaseMap_ST", new Vector4(1, 1, 0, 0));
         }
+
+        isBaked = true;
     }
     
     static void TerrainBakeMaterialGen(GameObject terrain, Material bakeMat, Vector2 newO, float l, int size, string path)

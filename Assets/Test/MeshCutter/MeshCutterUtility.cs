@@ -81,14 +81,14 @@ public class MeshCutterUtility
         // // 存储Mesh
         // string path = $"Art/TerrainBake/";
         // SaveMesh(newmesh, path);
-        
+        //
         // // 创建新GameObject在场景中
         // GameObject newObject = new GameObject();
         // newObject.transform.SetPositionAndRotation(targetObject.transform.position, targetObject.transform.rotation);
         // MeshFilter newMeshFilter = newObject.AddComponent<MeshFilter>();
         // MeshRenderer newMeshRenderer = newObject.AddComponent<MeshRenderer>();
         // newMeshFilter.mesh = newmesh;
-        // newMeshRenderer.material = targetObject.GetComponent<MeshRenderer>().material;
+        // newMeshRenderer.material = targetObject.GetComponent<MeshRenderer>().sharedMaterial;
         
         
         subMeshes.Add(newmesh);
@@ -209,7 +209,7 @@ public class MeshCutterUtility
     /// </summary>
     /// <param name="subMeshes"></param>
     /// <param name="path"></param>
-    public static void CreatNewObjects(GameObject ogObject, ref List<Mesh> subMeshes, out List<GameObject> newGameObjects, string path = "")
+    public static void CreatNewObjects(GameObject ogObject, ref List<Mesh> subMeshes, out List<GameObject> newGameObjects, string path = "", bool isBaked = false)
     {
         targetObject = ogObject;
         newGameObjects = new List<GameObject>();
@@ -225,18 +225,25 @@ public class MeshCutterUtility
         foreach (var sMesh in subMeshes)
         {
             // TODO 现在创建的GameObject始终在世界原点
+            // 创建Object
             GameObject newObject = new GameObject();
             newObject.name = sMesh.name;
             newObject.transform.SetPositionAndRotation(targetObject.transform.position, targetObject.transform.rotation);
+            // 添加组件
             MeshFilter newMeshFilter = newObject.AddComponent<MeshFilter>();
             MeshRenderer newMeshRenderer = newObject.AddComponent<MeshRenderer>();
-            // newMeshFilter.mesh = sMesh;
-            // Debug.Log($"{path}{sMesh.name}.asset");
-            newMeshFilter.mesh = AssetDatabase.LoadAssetAtPath<Mesh>($"{path}{sMesh.name}.asset");
-            newMeshRenderer.sharedMaterial = material;
-            
+            // 赋予Mesh和材质
+            newMeshFilter.sharedMesh = AssetDatabase.LoadAssetAtPath<Mesh>($"{path}{sMesh.name}.asset");
+            if (!isBaked)
+            {
+                newMeshRenderer.sharedMaterial = material;
+            }
+            else
+            {
+                newMeshRenderer.sharedMaterial =
+                    AssetDatabase.LoadAssetAtPath<Material>($"{path}{sMesh.name}.mat");
+            }
             newGameObjects.Add(newObject);
         }
     }
-    
 }
