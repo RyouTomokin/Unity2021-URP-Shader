@@ -13,7 +13,7 @@ public class MeshCutterEditor : EditorWindow
     // private int numSplits = 3;
     private float splitSize = 10.0f;
     
-    private List<Mesh> subMeshes;
+    // private List<Mesh> subMeshes;
     private string terrainMeshPath;
     private Vector3 centerOffset;
 
@@ -22,7 +22,7 @@ public class MeshCutterEditor : EditorWindow
     private static string[] resolutionOptions = new string[] { "256", "512", "1024" };
     private static int[] resolutionOptionsValue = new int[] { 256, 512, 1024};
 
-    private List<GameObject> appliedObjects;
+    // private List<GameObject> appliedObjects;
 
     private Material GL_Material;
     private List<Color> colors;
@@ -33,6 +33,22 @@ public class MeshCutterEditor : EditorWindow
     private string _path
     {
         get => rootPath + levelPath + "/";
+    }
+
+    private List<SubmeshInfo> _submeshInfos;
+    class SubmeshInfo
+    {
+        public Mesh mesh;
+        public GameObject gameObject;
+        public Vector2 newO;
+        public float maxLength;
+        
+        public SubmeshInfo(Mesh mesh) {
+            this.mesh = mesh;
+            this.gameObject = null;
+            this.newO = Vector2.zero;
+            this.maxLength = 0f;
+        }
     }
 
     [MenuItem("Tools/Mesh Cutter")]
@@ -73,6 +89,7 @@ public class MeshCutterEditor : EditorWindow
         GL_Material.SetInt("_ZTest", 0);
         
         isBaked = false;
+        _submeshInfos = new List<SubmeshInfo>();
     }
 
     private HashSet<Action<SceneView>> _hash = new();
@@ -161,29 +178,25 @@ public class MeshCutterEditor : EditorWindow
             Debug.LogError("No mesh found on the target object!");
             return;
         }
-
         // 如果模型已经应用，重新切割需要把应用的模型先删掉再重新应用
-        bool isApplied = false;
-        if (appliedObjects != null)
+        bool isApplied = _submeshInfos.Count > 0 && _submeshInfos[0].gameObject != null;
+        
+        ClearMeshSplit();
+        List<Mesh> meshList = new List<Mesh>();
+        _submeshInfos = new List<SubmeshInfo>();
+
+        MeshCutterUtility.SplitMeshToGrid(targetObject, originalMesh, ref meshList, splitSize, centerOffset);
+
+        MeshCutterUtility.SaveMeshs(ref meshList, _path);
+
+        foreach (var mesh in meshList)
         {
-            if (appliedObjects.Count > 0)
-            {
-                isApplied = true;
-                ReductionMeshSplit();
-            }
+            _submeshInfos.Add(new SubmeshInfo(mesh));
         }
-
-        subMeshes = new List<Mesh> { };
-        MeshCutterUtility.DeleteAssetsInDirectory(_path);
-
-        MeshCutterUtility.SplitMeshToGrid(targetObject, originalMesh, ref subMeshes, splitSize, centerOffset);
-
-        MeshCutterUtility.SaveMeshs(ref subMeshes, _path);
 
         if (isApplied)
         {
             ApplyMeshSplit();
-            isApplied = false;
         }
 
         Debug.Log("模型切割完成!");
@@ -191,43 +204,44 @@ public class MeshCutterEditor : EditorWindow
 
     private void ApplyMeshSplit()
     {
-        if (subMeshes == null)
+        if (_submeshInfos.Count == 0)
         {
             Debug.LogError("请先切分模型");
             return;
         }
-        else if (subMeshes.Count == 0)
+        if (_submeshInfos[0].gameObject != null)
         {
-            Debug.LogError("请先切分模型");
-            return;
+            ReductionMeshSplit();
         }
-        if (appliedObjects != null)
+
+        List<Mesh> meshList =
+            _submeshInfos.FindAll(submesh => submesh.mesh != null).ConvertAll(submesh => submesh.mesh);
+        List<GameObject> objectList;
+        MeshCutterUtility.CreatNewObjects(targetObject, ref meshList, out objectList, _path, isBaked);
+        for (int i = 0; i < _submeshInfos.Count; i++)
         {
-            if (appliedObjects.Count > 0)
-                ReductionMeshSplit();
+            _submeshInfos[i].gameObject = objectList[i];
         }
-        MeshCutterUtility.CreatNewObjects(targetObject, ref subMeshes, out appliedObjects, _path, isBaked);
         targetObject.SetActive(false);
     }
     
     private void ReductionMeshSplit()
     {
         targetObject.SetActive(true);
-        if (appliedObjects == null)
+        if (_submeshInfos.Count <= 0 || _submeshInfos[0].gameObject == null)
         {
             return;
         }
-        foreach (var obj in appliedObjects)
+        foreach (var submeshInfo in _submeshInfos)
         {
-            DestroyImmediate(obj);
+            DestroyImmediate(submeshInfo.gameObject);
         }
-        appliedObjects.Clear();
     }
 
     private void ClearMeshSplit()
     {
         ReductionMeshSplit();
-        subMeshes.Clear();
+        _submeshInfos.Clear();
         MeshCutterUtility.DeleteAssetsInDirectory(_path);
         isBaked = false;
     }
@@ -271,12 +285,7 @@ public class MeshCutterEditor : EditorWindow
 
     private void BakeTerrainTexture()
     {
-        if (subMeshes == null || appliedObjects == null)
-        {
-            Debug.LogError("请先切分模型");
-            return;
-        }
-        else if (subMeshes.Count == 0)
+        if (_submeshInfos.Count <= 0)
         {
             Debug.LogError("请先切分模型");
             return;
@@ -284,21 +293,26 @@ public class MeshCutterEditor : EditorWindow
 
         Material terrainMaterial = targetObject.GetComponent<MeshRenderer>().sharedMaterial;
 
-        for (int i = 0; i < appliedObjects.Count; i++)
+        for (int i = 0; i < _submeshInfos.Count; i++)
         {
-            var obj = appliedObjects[i];
-            var mesh = subMeshes[i];
+            var obj = _submeshInfos[i].gameObject;
+            var mesh = _submeshInfos[i].mesh;
             float maxLength;
             Vector2 newO;
-            // TODO 记录UV的修改，创建一个类单独记录Mesh Objects UV偏移 组件的信息
-            UV_Remapping(mesh, out maxLength, out newO);
+            if(_submeshInfos[i].maxLength == 0)
+                UV_Remapping(mesh, out _submeshInfos[i].maxLength, out _submeshInfos[i].newO);
             // TODO 烘焙颜色和法线贴图
-            TerrainBakeMaterialGen(obj, terrainMaterial, newO, maxLength, resolution, _path);
+            TerrainBakeMaterialGen(_submeshInfos[i], terrainMaterial, resolution, _path);
             
             terrainMaterial.SetVector("_BaseMap_ST", new Vector4(1, 1, 0, 0));
         }
 
         isBaked = true;
+    }
+
+    static void TerrainBakeMaterialGen(SubmeshInfo sub, Material bakeMat, int size, string path)
+    {
+        TerrainBakeMaterialGen(sub.gameObject, bakeMat, sub.newO, sub.maxLength, size, path);
     }
     
     static void TerrainBakeMaterialGen(GameObject terrain, Material bakeMat, Vector2 newO, float l, int size, string path)
