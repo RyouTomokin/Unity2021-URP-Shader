@@ -79,7 +79,7 @@ public class MeshCutter
         // 3. Separate triangles and cut those that intersect the plane
         for (int i = 0; i < ogTriangles.Count; i += 3)
         {
-            if (intersect.TrianglePlaneIntersect(ogVertices, ogUvs, ogTriangles, i, ref slice, PositiveMesh, NegativeMesh, intersectPair))
+            if (intersect.TrianglePlaneIntersect(ogVertices, ogUvs, ogNormals, ogTriangles, i, ref slice, PositiveMesh, NegativeMesh, intersectPair))
                 addedPairs.AddRange(intersectPair);
         }
         // 不需要产生截面，直接返回

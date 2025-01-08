@@ -27,6 +27,7 @@ public class Intersections
 
     // Initialize fixed arrays so that we don't initialize them every time we call TrianglePlaneIntersect
     private readonly Vector3[] v;
+    private readonly Vector3[] n;
     private readonly Vector2[] u;
     private readonly int[] t;
     private readonly bool[] positive;
@@ -38,6 +39,7 @@ public class Intersections
     {
         v = new Vector3[3];
         u = new Vector2[3];
+        n = new Vector3[3];
         t = new int[3];
         positive = new bool[3];
     }
@@ -45,7 +47,7 @@ public class Intersections
     /// <summary>
     /// Find intersection between a plane and a line segment defined by vectors first and second.
     /// </summary>
-    public ValueTuple<Vector3, Vector2> Intersect(Plane plane, Vector3 first, Vector3 second, Vector2 uv1, Vector2 uv2)
+    public ValueTuple<Vector3, Vector2> Intersect(Plane plane, Vector3 first, Vector3 second, Vector2 uv1, Vector2 uv2, Vector3 n1, Vector3 n2, out Vector3 n)
     {
         edgeRay.origin = first;
         edgeRay.direction = (second - first).normalized;
@@ -68,6 +70,7 @@ public class Intersections
         // Compute new uv by doing Linear interpolation between uv1 and uv2
         returnVal.Item2.x = Mathf.Lerp(uv1.x, uv2.x, relativeDist);
         returnVal.Item2.y = Mathf.Lerp(uv1.y, uv2.y, relativeDist);
+        n = n1 * relativeDist + n2 * (1 - relativeDist);
         return returnVal;
     }
 
@@ -85,7 +88,7 @@ public class Intersections
      *       |___________________
      */
 
-    public bool TrianglePlaneIntersect(List<Vector3> vertices, List<Vector2> uvs, List<int> triangles, int startIdx, ref Plane plane, TempMesh posMesh, TempMesh negMesh, Vector3[] intersectVectors)
+    public bool TrianglePlaneIntersect(List<Vector3> vertices, List<Vector2> uvs, List<Vector3> normals, List<int> triangles, int startIdx, ref Plane plane, TempMesh posMesh, TempMesh negMesh, Vector3[] intersectVectors)
     {
         int i;
 
@@ -94,6 +97,7 @@ public class Intersections
         {
             t[i] = triangles[startIdx + i];
             v[i] = vertices[t[i]];
+            n[i] = normals[t[i]];   // 添加法线的混合
             u[i] = uvs[t[i]];
         }
 
@@ -124,15 +128,17 @@ public class Intersections
         if (nextPoint == 3) nextPoint = 0;
 
         // Get the 2 intersection points
-        ValueTuple<Vector3, Vector2> newPointPrev = Intersect(plane, v[lonelyPoint], v[prevPoint], u[lonelyPoint], u[prevPoint]);
-        ValueTuple<Vector3, Vector2> newPointNext = Intersect(plane, v[lonelyPoint], v[nextPoint], u[lonelyPoint], u[nextPoint]);
+        Vector3 normalPrev;
+        Vector3 normalNext;
+        ValueTuple<Vector3, Vector2> newPointPrev = Intersect(plane, v[lonelyPoint], v[prevPoint], u[lonelyPoint], u[prevPoint], n[lonelyPoint], n[prevPoint],out normalPrev);
+        ValueTuple<Vector3, Vector2> newPointNext = Intersect(plane, v[lonelyPoint], v[nextPoint], u[lonelyPoint], u[nextPoint], n[lonelyPoint], n[nextPoint],out normalNext);
 
         //Set the new triangles and store them in respective tempmeshes
-        (positive[lonelyPoint] ? posMesh : negMesh).AddSlicedTriangle(t[lonelyPoint], newPointNext.Item1, newPointPrev.Item1, newPointNext.Item2, newPointPrev.Item2);
+        (positive[lonelyPoint] ? posMesh : negMesh).AddSlicedTriangle(t[lonelyPoint], newPointNext.Item1, newPointPrev.Item1, newPointNext.Item2, newPointPrev.Item2, normalNext, normalPrev);
 
-        (positive[prevPoint] ? posMesh : negMesh).AddSlicedTriangle(t[prevPoint], newPointPrev.Item1, newPointPrev.Item2, t[nextPoint]);
+        (positive[prevPoint] ? posMesh : negMesh).AddSlicedTriangle(t[prevPoint], newPointPrev.Item1, newPointPrev.Item2, normalPrev, t[nextPoint]);
 
-        (positive[prevPoint] ? posMesh : negMesh).AddSlicedTriangle(t[nextPoint], newPointPrev.Item1, newPointNext.Item1, newPointPrev.Item2, newPointNext.Item2);
+        (positive[prevPoint] ? posMesh : negMesh).AddSlicedTriangle(t[nextPoint], newPointPrev.Item1, newPointNext.Item1, newPointPrev.Item2, newPointNext.Item2, normalPrev, normalNext);
 
         // We return the edge that will be in the correct orientation for the positive side mesh
         if (positive[lonelyPoint])

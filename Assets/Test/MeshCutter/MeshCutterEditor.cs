@@ -97,11 +97,21 @@ public class MeshCutterEditor : EditorWindow
     {
         rootPath = EditorGUILayout.TextField("根目录", rootPath);
         levelPath = EditorGUILayout.TextField("关卡名", levelPath);
-        targetObject = (GameObject)EditorGUILayout.ObjectField("Target Object", targetObject, typeof(GameObject), true);
+        targetObject = (GameObject)EditorGUILayout.ObjectField("切割的模型", targetObject, typeof(GameObject), true);
         // numSplits = EditorGUILayout.IntField("Number of Splits", numSplits);
         splitSize = EditorGUILayout.FloatField("切割的尺寸", splitSize);
         centerOffset = EditorGUILayout.Vector3Field("中心偏移", centerOffset);
         
+        if (targetObject == null)
+        {
+            Debug.LogWarning("请添加需要切割模型");
+            if (_hash.Contains(OnSceneGUI))
+            {
+                _hash.Remove(OnSceneGUI);
+                SceneView.duringSceneGui -= OnSceneGUI;
+                SceneView.RepaintAll();
+            }
+        }
         
         if (GUILayout.Button("绘制预览") && !_hash.Contains(OnSceneGUI))
         {
@@ -125,7 +135,6 @@ public class MeshCutterEditor : EditorWindow
         
         if (GUILayout.Button("应用切割好的模型"))
         {
-            // TODO 烘焙好的模型，应用的方法需要修改
             ApplyMeshSplit();
         }
         

@@ -63,30 +63,30 @@ public class TempMesh
         surfacearea += GetTriangleArea(triangles.Count - 3);
     }
 
-    public void AddSlicedTriangle(int i1, Vector3 v2, Vector2 uv2, int i3)
+    public void AddSlicedTriangle(int i1, Vector3 v2, Vector2 uv2, Vector3 n2, int i3)
     {
         int v1 = vMapping[i1],
             v3 = vMapping[i3];
-        Vector3 normal = Vector3.Cross(v2 - vertices[v1], vertices[v3] - v2).normalized;
-
+        // Vector3 normal = Vector3.Cross(v2 - vertices[v1], vertices[v3] - v2).normalized;
+    
         triangles.Add(v1);
-        AddPoint(v2, normal, uv2);
+        AddPoint(v2, n2, uv2);
         triangles.Add(vMapping[i3]);
-
+    
         //Compute triangle area
         surfacearea += GetTriangleArea(triangles.Count - 3);
     }
-
-    public void AddSlicedTriangle(int i1, Vector3 v2, Vector3 v3, Vector2 uv2, Vector2 uv3)
+    
+    public void AddSlicedTriangle(int i1, Vector3 v2, Vector3 v3, Vector2 uv2, Vector2 uv3, Vector3 n2, Vector3 n3)
     {
         // Compute face normal?
         int v1 = vMapping[i1];
-        Vector3 normal = Vector3.Cross(v2 - vertices[v1], v3 - v2).normalized;
-
+        // Vector3 normal = Vector3.Cross(v2 - vertices[v1], v3 - v2).normalized;
+    
         triangles.Add(v1);
-        AddPoint(v2, normal, uv2);
-        AddPoint(v3, normal, uv3);
-
+        AddPoint(v2, n2, uv2);
+        AddPoint(v3, n3, uv3);
+    
         //Compute triangle area
         surfacearea += GetTriangleArea(triangles.Count - 3);
     }
