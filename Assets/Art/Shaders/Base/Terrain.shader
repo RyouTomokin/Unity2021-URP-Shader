@@ -1,0 +1,459 @@
+Shader "KIIF/Terrain"
+{
+    Properties
+    {
+        [MainColor] _BaseColor("Color", Color) = (1,1,1,1)
+        [MainTexture] _BaseMap("Albedo", 2DArray) = "white" {}
+        [Toggle(_DoubleSide)] _DoubleSide("双面", Float) = 0.0
+        [Toggle(_ALPHATEST_ON)] _AlphaTest("Alpha Clipping", Float) = 0.0
+        _Cutoff("剔除阈值", Range(0.0, 1.0)) = 0.5
+        _BumpScale("法线强度", Float) = 1.0
+        [NoScaleOffset] _BumpMap("Normal Map", 2DArray) = "bump" {}
+        [NoScaleOffset] _SMAEMap("R:光滑度 G:金属度 B:AO A:自发光", 2D) = "white" {}
+        _Smoothness("光滑度", Range(0.0, 1.0)) = 0.5
+        [Gamma] _Metallic("金属度", Range(0.0, 1.0)) = 0.0
+        _OcclusionStrength("AO", Range(0.0, 1.0)) = 1.0
+        
+        _LayerCount("Texture Array Layers", Int) = 4
+        [NoScaleOffset] _ControlMap("ControlMap", 2D) = "white" {}
+    }
+    SubShader
+    {
+        Tags{"RenderType" = "Opaque" "RenderPipeline" = "UniversalPipeline" "IgnoreProjector" = "True"}
+        LOD 300
+        //ForwardLit
+        Pass
+        {
+            Name "ForwardLit"
+            Tags{"LightMode" = "UniversalForward"}
+            ZWrite On
+            
+            HLSLPROGRAM
+
+            #pragma prefer_hlslcc gles
+            #pragma exclude_renderers d3d11_9x
+            #pragma target 2.0
+
+            // -------------------------------------
+            // Material Keywords
+            #pragma shader_feature_local_fragment  _ALPHATEST_ON
+            #pragma shader_feature_local _NORMALMAP
+            #pragma shader_feature_local_fragment  _SMAEMAP
+
+            // -------------------------------------
+            // Universal Pipeline keywords
+            #pragma multi_compile _ _MAIN_LIGHT_SHADOWS
+            #pragma multi_compile _ _MAIN_LIGHT_SHADOWS_CASCADE
+            #pragma multi_compile _ _ADDITIONAL_LIGHTS_VERTEX _ADDITIONAL_LIGHTS
+            // #pragma multi_compile _ _ADDITIONAL_LIGHT_SHADOWS
+            #pragma multi_compile _ _SHADOWS_SOFT
+            #pragma multi_compile _ _MIXED_LIGHTING_SUBTRACTIVE
+
+            // -------------------------------------
+            // Unity defined keywords
+            #pragma multi_compile _ DIRLIGHTMAP_COMBINED
+            #pragma multi_compile _ LIGHTMAP_ON
+            // #pragma multi_compile_fog
+
+            //--------------------------------------
+            // GPU Instancing
+            #pragma multi_compile_instancing
+            
+            #pragma vertex vert
+            #pragma fragment frag
+            
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
+            // #include "Assets/Art/Shaders/Library/KIIFPBR.hlsl"
+
+            struct Attributes
+            {
+                float4 positionOS   : POSITION;
+                float3 normalOS     : NORMAL;
+                float4 tangentOS    : TANGENT;
+                float2 texcoord     : TEXCOORD0;
+                UNITY_VERTEX_INPUT_INSTANCE_ID
+            };
+
+            struct Varyings
+            {
+                float2 uv                       : TEXCOORD0;
+                DECLARE_LIGHTMAP_OR_SH(lightmapUV, vertexSH, 1);
+
+                float3 positionWS               : TEXCOORD2;
+
+                #if defined(_NORMALMAP) || defined(_PARALLAX_ON)
+                float4 normalWS                 : TEXCOORD3;    // xyz: normal, w: viewDir.x
+                float4 tangentWS                : TEXCOORD4;    // xyz: tangent, w: viewDir.y
+                float4 bitangentWS              : TEXCOORD5;    // xyz: bitangent, w: viewDir.z
+                #else
+                float3 normalWS                 : TEXCOORD3;
+                float3 viewDirWS                : TEXCOORD4;
+                #endif
+
+                #if defined(REQUIRES_VERTEX_SHADOW_COORD_INTERPOLATOR)
+                float4 shadowCoord              : TEXCOORD7;
+                #endif
+                
+
+                float4 positionCS               : SV_POSITION;
+                UNITY_VERTEX_INPUT_INSTANCE_ID
+                UNITY_VERTEX_OUTPUT_STEREO
+            };
+            
+            CBUFFER_START(UnityPerMaterial)
+            float4 _BaseMap_ST;
+            half4 _BaseColor;
+            half _Cutoff;
+            half _BumpScale;
+            half _Smoothness;
+            half _Metallic;
+            half _OcclusionStrength;
+            half _LayerCount;
+            CBUFFER_END
+            TEXTURE2D_ARRAY(_BaseMap);         SAMPLER(sampler_BaseMap);
+            TEXTURE2D_ARRAY(_BumpMap);         SAMPLER(sampler_BumpMap);
+            TEXTURE2D(_ControlMap);            SAMPLER(sampler_ControlMap);
+            
+            // inline void TerrainInitialize(Varyings input, out PBRData out_data)
+            // {
+            //     out_data = (PBRData)0;
+            //     float2 uv = input.uv;
+            //     out_data.albedoAlpha = SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, uv);
+            //     out_data.alpha = out_data.albedoAlpha.a * _BaseColor.a;
+            //     #if defined(_ALPHATEST_ON)
+            //     clip(out_data.alpha - _Cutoff);
+            //     #endif
+            //     out_data.albedo = out_data.albedoAlpha.rgb * _BaseColor.rgb;
+            //
+            //     #ifdef _SMAEMAP
+            //     half4 SMAE = SAMPLE_TEXTURE2D(_SMAEMap, sampler_SMAEMap, uv);
+            //     out_data.smoothness = SMAE.r * _Smoothness;
+            //     out_data.metallic = SMAE.g * _Metallic;
+            //     out_data.occlusion = lerp(1.0h, SMAE.b, _OcclusionStrength);
+            //     out_data.emissionColor = _EmissionColor.rgb * SMAE.a * _EmissionStrength;
+            //     #else
+            //     out_data.smoothness = _Smoothness;
+            //     out_data.metallic = _Metallic;
+            //     out_data.occlusion = 1.0h;
+            //     out_data.emissionColor = _EmissionColor.rgb * _EmissionStrength;
+            //     #endif
+            //     
+            //     out_data.positionWS = input.positionWS;
+            //
+            //     #ifdef _NORMALMAP
+            //     half4 normal = SAMPLE_TEXTURE2D(_BumpMap, sampler_BumpMap, uv);
+            //     half3 normalTS = UnpackNormalScale(normal, _BumpScale);
+            //     half3 viewDirWS = half3(input.normalWS.w, input.tangentWS.w, input.bitangentWS.w);
+            //     out_data.TangentToWorld = half3x3(input.tangentWS.xyz, input.bitangentWS.xyz, input.normalWS.xyz);
+            //     out_data.normalWS = TransformTangentToWorld(normalTS, out_data.TangentToWorld);
+            //     #else
+            //     // half3 normalTS = half3(0.0h, 0.0h, 1.0h);
+            //     half3 viewDirWS = input.viewDirWS;
+            //     out_data.TangentToWorld = half3x3(half3(1,0,0),half3(0,1,0),half3(0,0,1));//不会被使用
+            //     out_data.normalWS = input.normalWS;
+            //     #endif
+            //
+            //     out_data.normalWS.rgb = NormalizeNormalPerPixel(out_data.normalWS.rgb);
+            //     out_data.viewDirectionWS = SafeNormalize(viewDirWS);
+            // }
+
+            Varyings vert(Attributes input)
+            {
+                Varyings output = (Varyings)0;
+
+                UNITY_SETUP_INSTANCE_ID(input);
+                UNITY_TRANSFER_INSTANCE_ID(input, output);
+                UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(output);
+
+                VertexPositionInputs vertexInput = GetVertexPositionInputs(input.positionOS.xyz);
+                VertexNormalInputs normalInput = GetVertexNormalInputs(input.normalOS, input.tangentOS);
+                half3 viewDirWS = GetCameraPositionWS() - vertexInput.positionWS;
+
+                output.uv = TRANSFORM_TEX(input.texcoord, _BaseMap);
+
+                #if defined(_NORMALMAP) || defined(_PARALLAX_ON)
+                output.normalWS = half4(normalInput.normalWS, viewDirWS.x);
+                output.tangentWS = half4(normalInput.tangentWS, viewDirWS.y);
+                output.bitangentWS = half4(normalInput.bitangentWS, viewDirWS.z);
+                #else
+                output.normalWS = NormalizeNormalPerVertex(normalInput.normalWS);
+                output.viewDirWS = viewDirWS;
+                #endif
+
+                OUTPUT_LIGHTMAP_UV(input.lightmapUV, unity_LightmapST, output.lightmapUV);
+                OUTPUT_SH(output.normalWS.xyz, output.vertexSH);
+
+                output.positionWS = vertexInput.positionWS;
+
+                #if defined(REQUIRES_VERTEX_SHADOW_COORD_INTERPOLATOR)
+                output.shadowCoord = GetShadowCoord(vertexInput);
+                #endif
+
+                output.positionCS = vertexInput.positionCS;
+
+                #ifdef _SCREENPOSITION_ON
+                // output.screenPos = ComputeScreenPos(output.positionCS)/output.positionCS.w; 
+                output.screenPos = vertexInput.positionNDC/output.positionCS.w; 
+                #endif
+                
+                return output;
+            }
+
+            struct LayerSample
+            {
+                float4 albedo;  // 颜色贴图采样结果
+                float3 normal;  // 法线贴图采样结果
+            };
+
+            LayerSample SampleLayer(float2 uv, int layerIndex)
+            {
+                LayerSample result;
+
+                // 采样颜色贴图（Texture2DArray）
+                result.albedo = SAMPLE_TEXTURE2D_ARRAY(_BaseMap, sampler_BaseMap, uv, layerIndex);
+
+                #if defined(_NORMALMAP)
+                // 采样法线贴图（Texture2DArray）
+                result.normal = SAMPLE_TEXTURE2D_ARRAY(_BumpMap, sampler_BumpMap, uv, layerIndex).rgb * 2 - 1;
+                #endif                
+
+                return result;
+            }
+            
+            half4 frag(Varyings input) : SV_Target
+            {
+                UNITY_SETUP_INSTANCE_ID(input);
+                UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(input);
+
+                // -------------------------------------
+                //采样 初始化
+
+                // PBRData pbrData = (PBRData)0;    //KIIF自定义结构体
+                // TerrainInitialize(input, pbrData);
+
+                // 采样 ControlMap（控制贴图，用于权重混合）
+                float4 control = SAMPLE_TEXTURE2D(_ControlMap, sampler_ControlMap, input.uv);
+
+                float weights[4] = { control.r, control.g, control.b, control.a };
+
+                float4 finalColor = 0;
+                float3 finalNormal = float3(0, 0, 0);
+
+                for (int i = 0; i < _LayerCount; i++)
+                {
+                    float weight = weights[i];
+                    
+                    // 调用采样函数
+                    LayerSample layer = SampleLayer(input.uv, i);
+
+                    // 颜色混合
+                    finalColor += layer.albedo * weight;
+
+                    #if defined(_NORMALMAP)
+                    // 法线混合（简单加权，可能需要规范化）
+                    finalNormal += layer.normal * weight;
+                    #endif                    
+                }
+
+                #if defined(_NORMALMAP)
+                // 法线转换到世界空间
+                half3x3 tangentToWorld = half3x3(input.tangentWS.xyz, input.bitangentWS.xyz, input.normalWS.xyz);
+                finalNormal = TransformTangentToWorld(finalNormal, tangentToWorld);
+                #endif
+                
+
+                return finalColor;
+                
+                
+                // // -------------------------------------
+                // //PBR光照
+                // BRDFData brdfData = (BRDFData)0;
+                // InitializeBRDFData(pbrData.albedo, pbrData.metallic, half3(0.0h, 0.0h, 0.0h), pbrData.smoothness, pbrData.alpha, brdfData);
+                //
+                // half fogCoord = input.fogFactorAndVertexLight.x;
+                // half3 vertexLighting = input.fogFactorAndVertexLight.yzw;
+                //
+                // float4 shadowCoord = TransformWorldToShadowCoord(pbrData.positionWS); //主光计算阴影
+                // Light mainLight = GetMainLight(shadowCoord);
+                //
+                // half4 color = GetDirectLightColor(mainLight, brdfData, pbrData);
+                // half3 GIcolor = GetGIColor(input, mainLight, brdfData, pbrData);
+                //
+                // color.rgb += GIcolor;
+                //
+                // #ifdef _ADDITIONAL_LIGHTS
+                // color.rgb += GetAdditionalLightColor(brdfData, pbrData);
+                // #endif
+                
+                // -------------------------------------                
+                
+                // return color;
+            }
+            ENDHLSL
+        }
+        //Shadow
+        Pass
+        {
+            Name "ShadowCaster"
+            Tags{"LightMode" = "ShadowCaster"}
+
+            ZWrite On
+            ZTest LEqual
+            Cull[_Cull]
+
+            HLSLPROGRAM
+            // Required to compile gles 2.0 with standard srp library
+            #pragma prefer_hlslcc gles
+            #pragma exclude_renderers d3d11_9x
+            #pragma target 2.0
+
+            // -------------------------------------
+            // Material Keywords
+            #pragma shader_feature _ALPHATEST_ON
+
+            //--------------------------------------
+            // GPU Instancing
+            #pragma multi_compile_instancing
+            #pragma shader_feature _SMOOTHNESS_TEXTURE_ALBEDO_CHANNEL_A
+
+            #pragma vertex ShadowPassVertex
+            #pragma fragment ShadowPassFragment
+
+            // #include "Packages/com.unity.render-pipelines.universal/Shaders/LitInput.hlsl"
+            #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Common.hlsl"
+
+            // #include "Packages/com.unity.render-pipelines.universal/Shaders/ShadowCasterPass.hlsl"
+            #include "Assets/Art/Shaders/Library/KIIFPBR.hlsl"
+
+            float3 _LightDirection;
+            float3 _LightPosition;
+
+            float4 GetShadowPositionHClip(Attributes input)
+            {
+                float3 positionWS = TransformObjectToWorld(input.positionOS.xyz);
+                float3 normalWS = TransformObjectToWorldNormal(input.normalOS);
+
+                Light mainLight = GetMainLight();
+
+            #if _CASTING_PUNCTUAL_LIGHT_SHADOW
+                float3 lightDirectionWS = normalize(_LightPosition - positionWS);
+            #else
+                float3 lightDirectionWS = _LightDirection;
+            #endif
+
+                float4 positionCS = TransformWorldToHClip(ApplyShadowBias(positionWS, normalWS, lightDirectionWS));
+
+            #if UNITY_REVERSED_Z
+                positionCS.z = min(positionCS.z, UNITY_NEAR_CLIP_VALUE);
+            #else
+                positionCS.z = max(positionCS.z, UNITY_NEAR_CLIP_VALUE);
+            #endif
+
+                return positionCS;
+            }
+
+            Varyings ShadowPassVertex(Attributes input)
+            {
+                Varyings output = (Varyings)0;
+                UNITY_SETUP_INSTANCE_ID(input);
+
+                output.uv = TRANSFORM_TEX(input.texcoord, _BaseMap);
+                output.positionCS = GetShadowPositionHClip(input);
+                return output;
+            }
+
+            half4 ShadowPassFragment(Varyings input) : SV_TARGET
+            {
+                Alpha(SampleAlbedoAlpha(input.uv, TEXTURE2D_ARGS(_BaseMap, sampler_BaseMap)).a, _BaseColor, _Cutoff);
+                return 0;
+            }
+            ENDHLSL
+        }
+        //DepthOnly
+        Pass
+        {
+            Name "DepthOnly"
+            Tags{"LightMode" = "DepthOnly"}
+
+            ZWrite On
+            ColorMask 0
+            Cull[_Cull]
+
+            HLSLPROGRAM
+            // Required to compile gles 2.0 with standard srp library
+            #pragma prefer_hlslcc gles
+            #pragma exclude_renderers d3d11_9x
+            #pragma target 2.0
+
+            #pragma vertex DepthOnlyVertex
+            #pragma fragment DepthOnlyFragment
+
+            // -------------------------------------
+            // Material Keywords
+            #pragma shader_feature _ALPHATEST_ON
+            #pragma shader_feature _SMOOTHNESS_TEXTURE_ALBEDO_CHANNEL_A
+
+            //--------------------------------------
+            // GPU Instancing
+            #pragma multi_compile_instancing
+
+            // #include "Packages/com.unity.render-pipelines.universal/Shaders/LitInput.hlsl"
+            // #include "Packages/com.unity.render-pipelines.universal/Shaders/DepthOnlyPass.hlsl"
+            #include "Assets/Art/Shaders/Library/KIIFPBR.hlsl"
+
+            Varyings DepthOnlyVertex(Attributes input)
+            {
+                Varyings output = (Varyings)0;
+                UNITY_SETUP_INSTANCE_ID(input);
+                UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(output);
+
+                output.uv = TRANSFORM_TEX(input.texcoord, _BaseMap);
+                output.positionCS = TransformObjectToHClip(input.positionOS.xyz);
+                return output;
+            }
+
+
+            half4 DepthOnlyFragment(Varyings input) : SV_TARGET
+            {
+                UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(input);
+
+                Alpha(SampleAlbedoAlpha(input.uv, TEXTURE2D_ARGS(_BaseMap, sampler_BaseMap)).a, _BaseColor, _Cutoff);
+                return 0;
+            }
+            ENDHLSL
+        }
+        // This pass it not used during regular rendering, only for lightmap baking.
+        Pass
+        {
+            Name "Meta"
+            Tags{"LightMode" = "Meta"}
+
+            Cull Off
+
+            HLSLPROGRAM
+            // Required to compile gles 2.0 with standard srp library
+            #pragma prefer_hlslcc gles
+            #pragma exclude_renderers d3d11_9x
+
+            #pragma vertex UniversalVertexMeta
+            #pragma fragment UniversalFragmentMeta
+
+            #pragma shader_feature _SPECULAR_SETUP
+            #pragma shader_feature _EMISSION
+            #pragma shader_feature _SMAEMAP
+            #pragma shader_feature _METALLICSPECGLOSSMAP
+            #pragma shader_feature _ALPHATEST_ON
+            #pragma shader_feature _ _SMOOTHNESS_TEXTURE_ALBEDO_CHANNEL_A
+
+            #pragma shader_feature _SPECGLOSSMAP
+
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/MetaInput.hlsl"
+            #include "Assets/Art/Shaders/Library/KIIFMetaPass.hlsl"
+
+            ENDHLSL
+        }
+    }
+    CustomEditor "PBR_Base_ShaderGUI"
+}

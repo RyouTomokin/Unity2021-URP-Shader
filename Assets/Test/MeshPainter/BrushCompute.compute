@@ -1,0 +1,134 @@
+#pragma kernel PaintAtUV
+
+RWTexture2D<float4> _WeightMap;
+int _TexWidth;
+int _TexHeight;
+float _BrushSize;
+float _BrushStrength;
+int _WeightMapChannel;
+float2 _UV;
+
+[numthreads(8, 8, 1)]
+void PaintAtUV(uint2 id : SV_DispatchThreadID)
+{
+    if (id.x >= (uint)_TexWidth || id.y >= (uint)_TexHeight) return;
+
+    // 计算像素坐标
+    float2 pixelUV = id / float2(_TexWidth, _TexHeight);
+
+    // 计算像素与笔刷中心的距离
+    float2 brushCenter = _UV;
+    float dist = length(pixelUV - brushCenter);
+
+    if (dist > _BrushSize) return; // 超出笔刷半径，跳过
+
+    float4 pixel = _WeightMap[id]; // 读取当前像素值
+
+    // 计算新的权重
+    // float weight = saturate(pixel[_WeightMapChannel] + _BrushStrength);
+    // pixel[_WeightMapChannel] = weight;
+    switch (_WeightMapChannel)
+    {
+        case 0: pixel.r = saturate(pixel.r + _BrushStrength); break;
+        case 1: pixel.g = saturate(pixel.g + _BrushStrength); break;
+        case 2: pixel.b = saturate(pixel.b + _BrushStrength); break;
+        case 3: pixel.a = saturate(pixel.a + _BrushStrength); break;
+    }
+
+    // 归一化所有通道，确保总和不超过 1.0
+    float totalWeight = pixel.r + pixel.g + pixel.b + pixel.a;
+    if (totalWeight > 1.0f)
+    {
+        pixel /= totalWeight;
+    }
+
+    _WeightMap[id] = pixel; // 写回修改后的像素值
+}
+
+#pragma kernel DrawPaintRT
+
+RWTexture2D<float4> _PaintRT;
+// int _TexWidth;
+// int _TexHeight;
+// float _BrushSize;
+// float _BrushStrength;
+// float2 _UV;
+
+[numthreads(8, 8, 1)]
+void DrawPaintRT(uint2 id : SV_DispatchThreadID)
+{
+    if (id.x >= (uint)_TexWidth || id.y >= (uint)_TexHeight) return;
+
+    // 计算像素坐标
+    float2 pixelUV = id / float2(_TexWidth, _TexHeight);
+
+    // 计算像素与笔刷中心的距离
+    float2 brushCenter = _UV;
+    float dist = length(pixelUV - brushCenter);
+
+    if (dist > _BrushSize) return; // 超出笔刷半径，跳过
+
+    float4 pixel = _PaintRT[id]; // 读取当前像素值
+
+    //目前笔刷没有纹理也没有柔度
+    pixel.r = max(pixel.r, _BrushStrength);
+
+    _PaintRT[id] = pixel; // 写回修改后的像素值
+}
+
+#pragma kernel BlendWeightMaps
+
+RWTexture2D<float4> _FinalWeightMap;
+Texture2D<float4> _SavedWeightMap;
+Texture2D<float4> _PaintMap;
+
+[numthreads(8, 8, 1)]
+void BlendWeightMaps(uint2 id : SV_DispatchThreadID)
+{
+    float4 base = _SavedWeightMap[id];
+    float paint = _PaintMap[id].r;
+    // 纹理为线性，需要转换一下
+    paint = pow(saturate(paint), 0.45);
+    if (paint == 0)
+    {
+        _FinalWeightMap[id] = base;
+        return;
+    }
+
+    float frac = 0, total;
+    switch (_WeightMapChannel)
+    {
+        case 0: frac = saturate(base.r + paint); break;
+        case 1: frac = saturate(base.g + paint); break;
+        case 2: frac = saturate(base.b + paint); break;
+        case 3: frac = saturate(base.a + paint); break;
+    }
+
+    if(_WeightMapChannel == 0)
+    {
+        base.r = frac;
+        total = base.g + base.b + base.a;
+        if(total>0) base.gba *= (1 - frac) / total;
+    }
+    if(_WeightMapChannel == 1)
+    {
+        base.g = frac;
+        total = base.r + base.b + base.a;
+        if(total>0) base.rba *= (1 - frac) / total;
+    }
+    if(_WeightMapChannel == 2)
+    {
+        base.b = frac;
+        total = base.r + base.g + base.a;
+        if(total>0) base.rga *= (1 - frac) / total;
+    }
+    if(_WeightMapChannel == 3)
+    {
+        base.a = frac;
+        total = base.r + base.g + base.b;
+        if(total>0) base.rgb *= (1 - frac) / total;
+    }
+    base = base.rgba;
+
+    _FinalWeightMap[id] = base;
+}
