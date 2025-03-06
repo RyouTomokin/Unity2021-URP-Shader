@@ -4,246 +4,258 @@ using UnityEditor;
 using System.IO;
 using System.Linq;
 
-public class MeshCutterUtility
+namespace Tomokin
 {
-    private static MeshCutter meshCutter;
-    private static GameObject targetObject;
-
-    private static List<GameObject> baseObjects;
-
-    public static void SplitMeshToGrid(GameObject ogObject, Mesh originalMesh, ref List<Mesh> subMeshes, float splitSize, Vector3 splitOffset = new())
+    public class MeshCutterUtility
     {
-        targetObject = ogObject;
-        Vector3 meshSize = originalMesh.bounds.size;
-        Vector3 meshCenter = originalMesh.bounds.center + splitOffset;
+        private static MeshCutter meshCutter;
+        private static GameObject targetObject;
 
-        // 从X轴的负方向向正方向切割多次
-        int numSplitesX = Mathf.CeilToInt(meshSize.x / splitSize);
-        float minX = meshCenter.x - (meshSize.x / 2);
-        Mesh tempMesh = new Mesh();
-        CopyMesh(tempMesh, originalMesh);
-        List<Mesh> subMeshes_X = new List<Mesh> {};
-        // 多切割一次，把最后一个Mesh生成新Mesh资产
-        for (int i = 1; i <= numSplitesX; i++)
-        {
-            float slicePosition = minX + (i * splitSize);
-            // Debug.Log("切割X位置:"+ slicePosition);
-            Plane slicePlane = new Plane(Vector3.right, new Vector3(slicePosition, 0, 0));
-            SliceMeshToTwoParts(ref tempMesh, slicePlane, i, ref subMeshes_X);
-        }
+        private static List<GameObject> baseObjects;
 
-        // 从Z轴的负方向向正方向切割多次
-        foreach (Mesh m in subMeshes_X)
+        public static void SplitMeshToGrid(GameObject ogObject, Mesh originalMesh, ref List<Mesh> subMeshes,
+            float splitSize, Vector3 splitOffset = new())
         {
-            // Vector3 mSize = m.bounds.size;
-            // Vector3 mCenter = m.bounds.center;
-            int numSplitesZ = Mathf.CeilToInt(meshSize.z / splitSize);
-            float minZ = meshCenter.z - (meshSize.z / 2);
-            Mesh tMesh = m;
-            for (int i = 1; i <= numSplitesZ; i++)
+            targetObject = ogObject;
+            Vector3 meshSize = originalMesh.bounds.size;
+            Vector3 meshCenter = originalMesh.bounds.center + splitOffset;
+
+            // 从X轴的负方向向正方向切割多次
+            int numSplitesX = Mathf.CeilToInt(meshSize.x / splitSize);
+            float minX = meshCenter.x - (meshSize.x / 2);
+            Mesh tempMesh = new Mesh();
+            CopyMesh(tempMesh, originalMesh);
+            List<Mesh> subMeshes_X = new List<Mesh> { };
+            // 多切割一次，把最后一个Mesh生成新Mesh资产
+            for (int i = 1; i <= numSplitesX; i++)
             {
-                float slicePosition = minZ + (i * splitSize);
-                // Debug.Log("切割Z位置:"+ slicePosition);
-                Plane slicePlane = new Plane(Vector3.forward, new Vector3(0, 0, slicePosition));
-                SliceMeshToTwoParts(ref tMesh, slicePlane, i, ref subMeshes);
+                float slicePosition = minX + (i * splitSize);
+                // Debug.Log("切割X位置:"+ slicePosition);
+                Plane slicePlane = new Plane(Vector3.right, new Vector3(slicePosition, 0, 0));
+                SliceMeshToTwoParts(ref tempMesh, slicePlane, i, ref subMeshes_X);
+            }
+
+            // 从Z轴的负方向向正方向切割多次
+            foreach (Mesh m in subMeshes_X)
+            {
+                // Vector3 mSize = m.bounds.size;
+                // Vector3 mCenter = m.bounds.center;
+                int numSplitesZ = Mathf.CeilToInt(meshSize.z / splitSize);
+                float minZ = meshCenter.z - (meshSize.z / 2);
+                Mesh tMesh = m;
+                for (int i = 1; i <= numSplitesZ; i++)
+                {
+                    float slicePosition = minZ + (i * splitSize);
+                    // Debug.Log("切割Z位置:"+ slicePosition);
+                    Plane slicePlane = new Plane(Vector3.forward, new Vector3(0, 0, slicePosition));
+                    SliceMeshToTwoParts(ref tMesh, slicePlane, i, ref subMeshes);
+                }
             }
         }
-    }
 
-    private static void SliceMeshToTwoParts(ref Mesh mesh, Plane slicePlane, int iteration, ref List<Mesh> subMeshes)
-    {
-        // Debug.Log(mesh.name + "  i=" + iteration);
-        if(!(mesh.vertices.Length>0))
-            return;
-        meshCutter = new MeshCutter(8192);
-        // 切割后，并没有生成新Mesh的情况
-        if (!meshCutter.SliceMesh(mesh, ref slicePlane))
+        private static void SliceMeshToTwoParts(ref Mesh mesh, Plane slicePlane, int iteration,
+            ref List<Mesh> subMeshes)
         {
-            // 如果Plane的正方向没有顶点
-            if (slicePlane.GetDistanceToPoint(mesh.vertices[0]) < 0)
+            // Debug.Log(mesh.name + "  i=" + iteration);
+            if (!(mesh.vertices.Length > 0))
+                return;
+            meshCutter = new MeshCutter(8192);
+            // 切割后，并没有生成新Mesh的情况
+            if (!meshCutter.SliceMesh(mesh, ref slicePlane))
             {
-                Mesh copyMesh = new Mesh();
-                CopyMesh(copyMesh, mesh);
-                copyMesh.name = mesh.name + "_" + iteration.ToString("D2");
-                subMeshes.Add(copyMesh);
-                mesh.Clear();
+                // 如果Plane的正方向没有顶点
+                if (slicePlane.GetDistanceToPoint(mesh.vertices[0]) < 0)
+                {
+                    Mesh copyMesh = new Mesh();
+                    CopyMesh(copyMesh, mesh);
+                    copyMesh.name = mesh.name + "_" + iteration.ToString("D2");
+                    subMeshes.Add(copyMesh);
+                    mesh.Clear();
+                }
+
+                return;
             }
-            return;
-        }
-        
-        Mesh newmesh = new Mesh();
-        newmesh.name = mesh.name + "_" + iteration.ToString("D2");
-        // 把面片正面朝向的mesh作为原始的mesh，背面朝向的为新mesh
-        ReplaceMesh(mesh, meshCutter.PositiveMesh);
-        ReplaceMesh(newmesh, meshCutter.NegativeMesh);
-        
-        
-        // // 存储Mesh
-        // string path = $"Art/TerrainBake/";
-        // SaveMesh(newmesh, path);
-        //
-        // // 创建新GameObject在场景中
-        // GameObject newObject = new GameObject();
-        // newObject.transform.SetPositionAndRotation(targetObject.transform.position, targetObject.transform.rotation);
-        // MeshFilter newMeshFilter = newObject.AddComponent<MeshFilter>();
-        // MeshRenderer newMeshRenderer = newObject.AddComponent<MeshRenderer>();
-        // newMeshFilter.mesh = newmesh;
-        // newMeshRenderer.material = targetObject.GetComponent<MeshRenderer>().sharedMaterial;
-        
-        
-        subMeshes.Add(newmesh);
-    }
-    /// <summary>
-    /// Replace the mesh with tempMesh.
-    /// </summary>
-    static void ReplaceMesh(Mesh mesh, TempMesh tempMesh, MeshCollider collider = null)
-    {
-        mesh.Clear();
-        mesh.SetVertices(tempMesh.vertices);
-        mesh.SetTriangles(tempMesh.triangles, 0);
-        mesh.SetNormals(tempMesh.normals);
-        mesh.SetUVs(0, tempMesh.uvs);
-        
-        //mesh.RecalculateNormals();
-        mesh.RecalculateTangents();
 
-        if (collider != null && collider.enabled)
-        {
-            collider.sharedMesh = mesh;
-            collider.convex = true;
-        }
-        
-        mesh.RecalculateBounds();
-    }
-    
-    /// <summary>
-    /// Copy the mesh with tempMesh.
-    /// </summary>
-    static void CopyMesh(Mesh mesh, Mesh tempMesh, MeshCollider collider = null)
-    {
-        mesh.Clear();
-        mesh.name = tempMesh.name;
-        mesh.SetVertices(tempMesh.vertices);
-        mesh.SetTriangles(tempMesh.triangles, 0);
-        mesh.SetNormals(tempMesh.normals);
-        mesh.SetUVs(0, tempMesh.uv);
-        
-        //mesh.RecalculateNormals();
-        mesh.RecalculateTangents();
+            Mesh newmesh = new Mesh();
+            newmesh.name = mesh.name + "_" + iteration.ToString("D2");
+            // 把面片正面朝向的mesh作为原始的mesh，背面朝向的为新mesh
+            ReplaceMesh(mesh, meshCutter.PositiveMesh);
+            ReplaceMesh(newmesh, meshCutter.NegativeMesh);
 
-        if (collider != null && collider.enabled)
-        {
-            collider.sharedMesh = mesh;
-            collider.convex = true;
-        }
-        
-        mesh.RecalculateBounds();
-    }
 
-    /// <summary>
-    /// 存储Mesh资产到本地
-    /// </summary>
-    /// <param name="subMeshes"></param>
-    /// <param name="path"></param>
-    public static void SaveMeshs(ref List<Mesh> subMeshes, string path = "")
-    {
-        if(path == "")
-            path = $"Art/TerrainBake/";
-        
-        foreach (var sMesh in subMeshes)
-        {
-            SaveMesh(sMesh, path);
-        }
-        
-        AssetDatabase.Refresh();
-    }
-    
-    private static void SaveMesh(Mesh mesh, string path)
-    {
-        // 创建路径文件夹，如果不存在
-        if (!Directory.Exists(Application.dataPath + "/" + path))
-        {
-            Directory.CreateDirectory(Application.dataPath + "/" + path);
-        }
-        path = $"Assets/{path}";
+            // // 存储Mesh
+            // string path = $"Art/TerrainBake/";
+            // SaveMesh(newmesh, path);
+            //
+            // // 创建新GameObject在场景中
+            // GameObject newObject = new GameObject();
+            // newObject.transform.SetPositionAndRotation(targetObject.transform.position, targetObject.transform.rotation);
+            // MeshFilter newMeshFilter = newObject.AddComponent<MeshFilter>();
+            // MeshRenderer newMeshRenderer = newObject.AddComponent<MeshRenderer>();
+            // newMeshFilter.mesh = newmesh;
+            // newMeshRenderer.material = targetObject.GetComponent<MeshRenderer>().sharedMaterial;
 
-        // 检查是否已经存在一个 mesh 在路径，如果是则重写
-        path = $"{path}{mesh.name}.asset";
-        Mesh existingMesh = AssetDatabase.LoadAssetAtPath<Mesh>(path);
-        if (existingMesh != null)
-        {
-            EditorUtility.CopySerialized(mesh, existingMesh);
-            AssetDatabase.SaveAssets();
-        }
-        else
-        {
-            // 创建一个新的 mesh 资源
-            AssetDatabase.CreateAsset(mesh, path);
+
+            subMeshes.Add(newmesh);
         }
 
-        AssetDatabase.SaveAssets();
-    }
-    
-    // 删除指定目录下的所有资产
-    public static void DeleteAssetsInDirectory(string directoryPath)
-    {
-        directoryPath = $"Assets/{directoryPath}";
-        // 获取指定目录下的所有资产路径
-        string[] assetPaths = AssetDatabase.FindAssets("", new[] { directoryPath });
-
-        foreach (string assetPath in assetPaths)
+        /// <summary>
+        /// Replace the mesh with tempMesh.
+        /// </summary>
+        static void ReplaceMesh(Mesh mesh, TempMesh tempMesh, MeshCollider collider = null)
         {
-            // 获取资产的完整路径
-            string fullPath = AssetDatabase.GUIDToAssetPath(assetPath);
-            
-            // 删除资产
-            AssetDatabase.DeleteAsset(fullPath);
+            mesh.Clear();
+            mesh.SetVertices(tempMesh.vertices);
+            mesh.SetTriangles(tempMesh.triangles, 0);
+            mesh.SetNormals(tempMesh.normals);
+            mesh.SetUVs(0, tempMesh.uvs);
+
+            //mesh.RecalculateNormals();
+            mesh.RecalculateTangents();
+
+            if (collider != null && collider.enabled)
+            {
+                collider.sharedMesh = mesh;
+                collider.convex = true;
+            }
+
+            mesh.RecalculateBounds();
         }
 
-        // 强制刷新数据库以应用更改
-        AssetDatabase.Refresh();
-    }
-    
-    /// <summary>
-    /// 创建新GameObject在场景中
-    /// </summary>
-    /// <param name="subMeshes"></param>
-    /// <param name="path"></param>
-    public static void CreatNewObjects(GameObject ogObject, ref List<Mesh> subMeshes, out List<GameObject> newGameObjects, string path = "", bool isBaked = false)
-    {
-        targetObject = ogObject;
-        newGameObjects = new List<GameObject>();
-        if (path == "")
+        /// <summary>
+        /// Copy the mesh with tempMesh.
+        /// </summary>
+        static void CopyMesh(Mesh mesh, Mesh tempMesh, MeshCollider collider = null)
         {
-            path = $"Assets/Art/TerrainBake/";
+            mesh.Clear();
+            mesh.name = tempMesh.name;
+            mesh.SetVertices(tempMesh.vertices);
+            mesh.SetTriangles(tempMesh.triangles, 0);
+            mesh.SetNormals(tempMesh.normals);
+            mesh.SetUVs(0, tempMesh.uv);
+
+            //mesh.RecalculateNormals();
+            mesh.RecalculateTangents();
+
+            if (collider != null && collider.enabled)
+            {
+                collider.sharedMesh = mesh;
+                collider.convex = true;
+            }
+
+            mesh.RecalculateBounds();
         }
-        else
+
+        /// <summary>
+        /// 存储Mesh资产到本地
+        /// </summary>
+        /// <param name="subMeshes"></param>
+        /// <param name="path"></param>
+        public static void SaveMeshs(ref List<Mesh> subMeshes, string path = "")
         {
+            if (path == "")
+                path = $"Art/TerrainBake/";
+
+            foreach (var sMesh in subMeshes)
+            {
+                SaveMesh(sMesh, path);
+            }
+
+            AssetDatabase.Refresh();
+        }
+
+        private static void SaveMesh(Mesh mesh, string path)
+        {
+            // 创建路径文件夹，如果不存在
+            if (!Directory.Exists(Application.dataPath + "/" + path))
+            {
+                Directory.CreateDirectory(Application.dataPath + "/" + path);
+            }
+
             path = $"Assets/{path}";
-        }
-        Material material = targetObject.GetComponent<MeshRenderer>().sharedMaterial;
-        foreach (var sMesh in subMeshes)
-        {
-            // TODO 现在创建的GameObject始终在世界原点
-            // 创建Object
-            GameObject newObject = new GameObject();
-            newObject.name = sMesh.name;
-            newObject.transform.SetPositionAndRotation(targetObject.transform.position, targetObject.transform.rotation);
-            // 添加组件
-            MeshFilter newMeshFilter = newObject.AddComponent<MeshFilter>();
-            MeshRenderer newMeshRenderer = newObject.AddComponent<MeshRenderer>();
-            // 赋予Mesh和材质
-            newMeshFilter.sharedMesh = AssetDatabase.LoadAssetAtPath<Mesh>($"{path}{sMesh.name}.asset");
-            if (!isBaked)
+
+            // 检查是否已经存在一个 mesh 在路径，如果是则重写
+            path = $"{path}{mesh.name}.asset";
+            Mesh existingMesh = AssetDatabase.LoadAssetAtPath<Mesh>(path);
+            if (existingMesh != null)
             {
-                newMeshRenderer.sharedMaterial = material;
+                EditorUtility.CopySerialized(mesh, existingMesh);
+                AssetDatabase.SaveAssets();
             }
             else
             {
-                newMeshRenderer.sharedMaterial =
-                    AssetDatabase.LoadAssetAtPath<Material>($"{path}{sMesh.name}.mat");
+                // 创建一个新的 mesh 资源
+                AssetDatabase.CreateAsset(mesh, path);
             }
-            newGameObjects.Add(newObject);
+
+            AssetDatabase.SaveAssets();
+        }
+
+        // 删除指定目录下的所有资产
+        public static void DeleteAssetsInDirectory(string directoryPath)
+        {
+            directoryPath = $"Assets/{directoryPath}";
+            // 获取指定目录下的所有资产路径
+            string[] assetPaths = AssetDatabase.FindAssets("", new[] { directoryPath });
+
+            foreach (string assetPath in assetPaths)
+            {
+                // 获取资产的完整路径
+                string fullPath = AssetDatabase.GUIDToAssetPath(assetPath);
+
+                // 删除资产
+                AssetDatabase.DeleteAsset(fullPath);
+            }
+
+            // 强制刷新数据库以应用更改
+            AssetDatabase.Refresh();
+        }
+
+        /// <summary>
+        /// 创建新GameObject在场景中
+        /// </summary>
+        /// <param name="subMeshes"></param>
+        /// <param name="path"></param>
+        public static void CreatNewObjects(GameObject ogObject, ref List<Mesh> subMeshes,
+            out List<GameObject> newGameObjects, string path = "", bool isBaked = false)
+        {
+            targetObject = ogObject;
+            newGameObjects = new List<GameObject>();
+            if (path == "")
+            {
+                path = $"Assets/Art/TerrainBake/";
+            }
+            else
+            {
+                path = $"Assets/{path}";
+            }
+
+            Material material = targetObject.GetComponent<MeshRenderer>().sharedMaterial;
+            foreach (var sMesh in subMeshes)
+            {
+                // TODO 现在创建的GameObject始终在世界原点
+                // 创建Object
+                GameObject newObject = new GameObject();
+                newObject.name = sMesh.name;
+                newObject.transform.SetPositionAndRotation(targetObject.transform.position,
+                    targetObject.transform.rotation);
+                // 添加组件
+                MeshFilter newMeshFilter = newObject.AddComponent<MeshFilter>();
+                MeshRenderer newMeshRenderer = newObject.AddComponent<MeshRenderer>();
+                // 赋予Mesh和材质
+                newMeshFilter.sharedMesh = AssetDatabase.LoadAssetAtPath<Mesh>($"{path}{sMesh.name}.asset");
+                if (!isBaked)
+                {
+                    newMeshRenderer.sharedMaterial = material;
+                }
+                else
+                {
+                    newMeshRenderer.sharedMaterial =
+                        AssetDatabase.LoadAssetAtPath<Material>($"{path}{sMesh.name}.mat");
+                }
+
+                newGameObjects.Add(newObject);
+            }
         }
     }
 }
