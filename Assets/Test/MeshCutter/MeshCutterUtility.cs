@@ -155,6 +155,11 @@ namespace Tomokin
         {
             if (path == "")
                 path = $"Art/TerrainBake/";
+            
+            if (!Directory.Exists(path))
+            {
+                Directory.CreateDirectory(path);
+            }
 
             foreach (var sMesh in subMeshes)
             {
@@ -233,26 +238,50 @@ namespace Tomokin
             Material material = targetObject.GetComponent<MeshRenderer>().sharedMaterial;
             foreach (var sMesh in subMeshes)
             {
-                // TODO 现在创建的GameObject始终在世界原点
+                string originalMeshPath = $"{path}{sMesh.name}.asset";
+                // 读取原始Mesh资源
+                // Mesh originalMesh = AssetDatabase.LoadAssetAtPath<Mesh>(originalMeshPath);
+                Mesh originalMesh = sMesh;
+                if (originalMesh == null)
+                {
+                    Debug.LogError($"Mesh {sMesh.name} not found at path: {originalMeshPath}");
+                    continue;
+                }
+
+                // 计算中心偏移
+                Vector3 centerOffset = originalMesh.bounds.center;
+
+                // 直接修改原始Mesh的顶点数据
+                Vector3[] vertices = originalMesh.vertices;
+                for (int i = 0; i < vertices.Length; i++)
+                {
+                    vertices[i] -= centerOffset; // 让几何中心对齐Pivot
+                }
+                originalMesh.vertices = vertices;
+                originalMesh.RecalculateBounds();
+                originalMesh.RecalculateNormals(); // 重新计算法线，防止光照错误
+
+                // 标记Mesh已更改，并保存
+                EditorUtility.SetDirty(originalMesh);
+                AssetDatabase.SaveAssets();
+                AssetDatabase.Refresh();
+
+                // ================================================================
                 // 创建Object
                 GameObject newObject = new GameObject();
                 newObject.name = sMesh.name;
                 newObject.transform.SetPositionAndRotation(targetObject.transform.position,
                     targetObject.transform.rotation);
+                newObject.transform.position += targetObject.transform.TransformVector(centerOffset);
+                newObject.transform.SetParent(targetObject.transform.parent, true);
                 // 添加组件
                 MeshFilter newMeshFilter = newObject.AddComponent<MeshFilter>();
                 MeshRenderer newMeshRenderer = newObject.AddComponent<MeshRenderer>();
                 // 赋予Mesh和材质
-                newMeshFilter.sharedMesh = AssetDatabase.LoadAssetAtPath<Mesh>($"{path}{sMesh.name}.asset");
-                if (!isBaked)
-                {
-                    newMeshRenderer.sharedMaterial = material;
-                }
-                else
-                {
-                    newMeshRenderer.sharedMaterial =
-                        AssetDatabase.LoadAssetAtPath<Material>($"{path}{sMesh.name}.mat");
-                }
+                newMeshFilter.sharedMesh = AssetDatabase.LoadAssetAtPath<Mesh>(originalMeshPath);
+                newMeshRenderer.sharedMaterial = isBaked
+                    ? AssetDatabase.LoadAssetAtPath<Material>($"{path}{sMesh.name}.mat")
+                    : material;
 
                 newGameObjects.Add(newObject);
             }

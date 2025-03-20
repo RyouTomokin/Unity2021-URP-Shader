@@ -43,6 +43,8 @@ namespace Tomokin
             get => rootPath + levelPath + "/";
         }
 
+        private string oldPath;
+        
         private List<SubmeshInfo> _submeshInfos;
         class SubmeshInfo
         {
@@ -157,6 +159,10 @@ namespace Tomokin
 
             if (GUILayout.Button("切分模型"))
             {
+                if (_path != oldPath)
+                {
+                    _submeshInfos.Clear();
+                }
                 ExecuteMeshSplit();
             }
             EditorGUILayout.EndVertical();
@@ -242,13 +248,14 @@ namespace Tomokin
             // 如果模型已经应用，重新切割需要把应用的模型先删掉再重新应用
             bool isApplied = _submeshInfos.Count > 0 && _submeshInfos[0].gameObject != null;
 
-            ClearMeshSplit();
+            if(oldPath == _path) ClearMeshSplit();
             List<Mesh> meshList = new List<Mesh>();
             _submeshInfos = new List<SubmeshInfo>();
 
             MeshCutterUtility.SplitMeshToGrid(targetObject, originalMesh, ref meshList, splitSize, centerOffset);
 
             MeshCutterUtility.SaveMeshs(ref meshList, _path);
+            oldPath = _path;
 
             foreach (var mesh in meshList)
             {
