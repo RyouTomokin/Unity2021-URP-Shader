@@ -47,6 +47,8 @@ void PaintAtUV(uint2 id : SV_DispatchThreadID)
 
 #pragma kernel DrawPaintRT
 
+Texture2D<float4> _BrushMap;
+SamplerState sampler_Linear_Clamp;
 RWTexture2D<float4> _PaintRT;
 // int _TexWidth;
 // int _TexHeight;
@@ -64,71 +66,169 @@ void DrawPaintRT(uint2 id : SV_DispatchThreadID)
 
     // 计算像素与笔刷中心的距离
     float2 brushCenter = _UV;
-    float dist = length(pixelUV - brushCenter);
+    // float dist = length(pixelUV - brushCenter);
+    //
+    // if (dist > _BrushSize) return; // 超出笔刷半径，跳过
 
-    if (dist > _BrushSize) return; // 超出笔刷半径，跳过
+    float2 brushUV = (pixelUV - brushCenter) / (_BrushSize * 2) + 0.5; // 归一化到[0,1]范围
+    // 采样笔刷纹理
+    float brushAlpha = _BrushMap.SampleLevel(sampler_Linear_Clamp, brushUV, 0).a;
+    // 超出笔刷范围的直接跳过
+    if (brushUV.x < 0 || brushUV.x > 1 || brushUV.y < 0 || brushUV.y > 1) return;
 
     float4 pixel = _PaintRT[id]; // 读取当前像素值
 
     //目前笔刷没有纹理也没有柔度
-    pixel.r = max(pixel.r, _BrushStrength);
+    pixel.r = max(pixel.r, _BrushStrength * brushAlpha);
 
     _PaintRT[id] = pixel; // 写回修改后的像素值
 }
 
 #pragma kernel BlendWeightMaps
 
-RWTexture2D<float4> _FinalWeightMap;
-Texture2D<float4> _SavedWeightMap;
-Texture2D<float4> _PaintMap;
+// RWTexture2D<float4> _FinalWeightMap;
+// Texture2D<float4> _SavedWeightMap;
+// Texture2D<float4> _PaintMap;
+//
+// [numthreads(8, 8, 1)]
+// void BlendWeightMaps(uint2 id : SV_DispatchThreadID)
+// {
+//     float4 base = _SavedWeightMap[id];
+//     float paint = _PaintMap[id].r;
+//     // 纹理为线性，需要转换一下
+//     paint = pow(saturate(paint), 0.45);
+//     if (paint == 0)
+//     {
+//         _FinalWeightMap[id] = base;
+//         return;
+//     }
+//
+//     float frac = 0, total;
+//     switch (_WeightMapChannel)
+//     {
+//         case 0: frac = saturate(base.r + paint); break;
+//         case 1: frac = saturate(base.g + paint); break;
+//         case 2: frac = saturate(base.b + paint); break;
+//         case 3: frac = saturate(base.a + paint); break;
+//     }
+//
+//     if(_WeightMapChannel == 0)
+//     {
+//         base.r = frac;
+//         total = base.g + base.b + base.a;
+//         if(total>0) base.gba *= (1 - frac) / total;
+//     }
+//     if(_WeightMapChannel == 1)
+//     {
+//         base.g = frac;
+//         total = base.r + base.b + base.a;
+//         if(total>0) base.rba *= (1 - frac) / total;
+//     }
+//     if(_WeightMapChannel == 2)
+//     {
+//         base.b = frac;
+//         total = base.r + base.g + base.a;
+//         if(total>0) base.rga *= (1 - frac) / total;
+//     }
+//     if(_WeightMapChannel == 3)
+//     {
+//         base.a = frac;
+//         total = base.r + base.g + base.b;
+//         if(total>0) base.rgb *= (1 - frac) / total;
+//     }
+//     base = base.rgba;
+//
+//     _FinalWeightMap[id] = base;
+// }
+
+// 只读的原始权重纹理
+Texture2DArray<float4> _WeightMapArray;
+
+// 只读的绘制纹理（单通道）
+Texture2D<float> _PaintMap;
+
+// 读写：更新后的权重纹理
+RWTexture2DArray<float4> _OutputWeightMapArray;
+
+uint _LayerCount;       // 总共多少个地形层(N)
+uint _TargetLayer;      // 需要修改的层索引(0~N)
+// float _BrushStrength;  // 画笔强度
+
+// 根据层索引获取 float4 对应的通道
+float GetChannelValue(float4 data, uint layer) {
+    if ((layer & 3) == 0) return data.r;
+    if ((layer & 3) == 1) return data.g;
+    if ((layer & 3) == 2) return data.b;
+    return data.a;
+}
+
+// 设置 float4 对应的通道
+void SetChannelValue(inout float4 data, uint layer, float value) {
+    if ((layer & 3) == 0) data.r = value;
+    else if ((layer & 3) == 1) data.g = value;
+    else if ((layer & 3) == 2) data.b = value;
+    else data.a = value;
+}
 
 [numthreads(8, 8, 1)]
-void BlendWeightMaps(uint2 id : SV_DispatchThreadID)
-{
-    float4 base = _SavedWeightMap[id];
-    float paint = _PaintMap[id].r;
-    // 纹理为线性，需要转换一下
-    paint = pow(saturate(paint), 0.45);
-    if (paint == 0)
-    {
-        _FinalWeightMap[id] = base;
-        return;
+void BlendWeightMaps(uint2 id : SV_DispatchThreadID) {
+    
+    // _OutputWeightMapArray[int3(id.x, id.y, 0)] =  _PaintMap[id];
+    // _OutputWeightMapArray[int3(id.x, id.y, 1)] = _WeightMapArray[int3(id.x, id.y, 1)];
+    // return;
+    // 读取所有层的权重值（单通道 float）
+    float weights[16];
+    float totalWeight = 0.0;
+    float4 texData[4];  // 16 层 / 4 = 4 个 float4 纹理存储
+    // 读取所有纹理数据
+    for (uint texIndex = 0; texIndex < (_LayerCount + 3) >> 2; texIndex++) {
+        texData[texIndex] = _WeightMapArray.Load(int4(id.x, id.y, texIndex, 0));
+    }
+    // 提取权重
+    for (uint weightIndex = 0; weightIndex < _LayerCount; weightIndex++) {
+        weights[weightIndex] = GetChannelValue(texData[weightIndex >> 2], weightIndex);
+        totalWeight += weights[weightIndex];
+    }    
+
+    // 读取绘制值（单通道），应用到目标通道
+    // float paintValue = step(0.1, _PaintMap[id]) * _BrushStrength;
+    float paintValue = _PaintMap[id];
+    float newWeight = clamp(paintValue + weights[_TargetLayer], 0, 1);
+    totalWeight += newWeight - weights[_TargetLayer];
+    weights[_TargetLayer] = newWeight;
+    
+    // 归一化，保持权重总和 = 1
+    float excess = max(totalWeight - 1.0, 0.0);
+    
+    if (excess > 0) {
+        float otherSum = totalWeight - weights[_TargetLayer];
+        for (uint i = 0; i < _LayerCount; i++) {
+            if (i != _TargetLayer && otherSum > 0) {
+                weights[i] -= (weights[i] / otherSum) * excess;
+            }
+        }
     }
 
-    float frac = 0, total;
-    switch (_WeightMapChannel)
-    {
-        case 0: frac = saturate(base.r + paint); break;
-        case 1: frac = saturate(base.g + paint); break;
-        case 2: frac = saturate(base.b + paint); break;
-        case 3: frac = saturate(base.a + paint); break;
-    }
+    // 检查是否归一化
+    // float newTotalWeight = 0.0;
+    // for(uint checkIndex = 0;checkIndex<_LayerCount; checkIndex++)
+    // {
+    //     newTotalWeight += weights[checkIndex];
+    // }
+    // if(newTotalWeight!=1 &&newWeight!=0)
+    // {
+    //     for(uint checkIndex = 0;checkIndex<_LayerCount; checkIndex++)
+    //     {
+    //         weights[checkIndex] /= newTotalWeight;
+    //     }
+    // }
 
-    if(_WeightMapChannel == 0)
-    {
-        base.r = frac;
-        total = base.g + base.b + base.a;
-        if(total>0) base.gba *= (1 - frac) / total;
+    // 更新 float4 结构
+    for (uint updateIndex = 0; updateIndex < _LayerCount; updateIndex++) {
+        SetChannelValue(texData[updateIndex >> 2], updateIndex, weights[updateIndex]);
     }
-    if(_WeightMapChannel == 1)
-    {
-        base.g = frac;
-        total = base.r + base.b + base.a;
-        if(total>0) base.rba *= (1 - frac) / total;
+    // 重新写入权重纹理
+    for (uint writeIndex = 0; writeIndex < (_LayerCount + 3) >> 2; writeIndex++) {
+        _OutputWeightMapArray[int3(id.x, id.y, writeIndex)] = texData[writeIndex];
     }
-    if(_WeightMapChannel == 2)
-    {
-        base.b = frac;
-        total = base.r + base.g + base.a;
-        if(total>0) base.rga *= (1 - frac) / total;
-    }
-    if(_WeightMapChannel == 3)
-    {
-        base.a = frac;
-        total = base.r + base.g + base.b;
-        if(total>0) base.rgb *= (1 - frac) / total;
-    }
-    base = base.rgba;
-
-    _FinalWeightMap[id] = base;
 }

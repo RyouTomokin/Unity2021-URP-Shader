@@ -4,6 +4,25 @@ Shader "KIIF/Terrain"
     {
         [MainColor] _BaseColor("Color", Color) = (1,1,1,1)
         [MainTexture] _BaseMap("Albedo", 2DArray) = "white" {}
+        _LayerCount("Texture Array Layers", Int) = 4
+
+        _UVScale01("UVScale01", Float) = 1
+        _UVScale02("UVScale02", Float) = 1
+        _UVScale03("UVScale03", Float) = 1
+        _UVScale04("UVScale04", Float) = 1
+        _UVScale05("UVScale05", Float) = 1
+        _UVScale06("UVScale06", Float) = 1
+        _UVScale07("UVScale07", Float) = 1
+        _UVScale08("UVScale08", Float) = 1
+        _UVScale09("UVScale09", Float) = 1
+        _UVScale10("UVScale10", Float) = 1
+        _UVScale11("UVScale11", Float) = 1
+        _UVScale12("UVScale12", Float) = 1
+        _UVScale13("UVScale13", Float) = 1
+        _UVScale14("UVScale14", Float) = 1
+        _UVScale15("UVScale15", Float) = 1
+        _UVScale16("UVScale16", Float) = 1
+
         [Toggle(_DoubleSide)] _DoubleSide("双面", Float) = 0.0
         [Toggle(_ALPHATEST_ON)] _AlphaTest("Alpha Clipping", Float) = 0.0
         _Cutoff("剔除阈值", Range(0.0, 1.0)) = 0.5
@@ -14,8 +33,9 @@ Shader "KIIF/Terrain"
         [Gamma] _Metallic("金属度", Range(0.0, 1.0)) = 0.0
         _OcclusionStrength("AO", Range(0.0, 1.0)) = 1.0
         
-        _LayerCount("Texture Array Layers", Int) = 4
-        [NoScaleOffset] _ControlMap("ControlMap", 2D) = "white" {}
+        _HeightTransition("HeightTransition", Range(0, 1.0)) = 0.0
+
+        [NoScaleOffset] _ControlMap("ControlMap", 2DArray) = "white" {}
     }
     SubShader
     {
@@ -27,7 +47,7 @@ Shader "KIIF/Terrain"
             Name "ForwardLit"
             Tags{"LightMode" = "UniversalForward"}
             ZWrite On
-            
+
             HLSLPROGRAM
 
             #pragma prefer_hlslcc gles
@@ -39,6 +59,7 @@ Shader "KIIF/Terrain"
             #pragma shader_feature_local_fragment  _ALPHATEST_ON
             #pragma shader_feature_local _NORMALMAP
             #pragma shader_feature_local_fragment  _SMAEMAP
+            #pragma shader_feature_local_fragment  _BAKEMODE
 
             // -------------------------------------
             // Universal Pipeline keywords
@@ -58,10 +79,10 @@ Shader "KIIF/Terrain"
             //--------------------------------------
             // GPU Instancing
             #pragma multi_compile_instancing
-            
+
             #pragma vertex vert
             #pragma fragment frag
-            
+
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
             // #include "Assets/Art/Shaders/Library/KIIFPBR.hlsl"
@@ -94,69 +115,46 @@ Shader "KIIF/Terrain"
                 #if defined(REQUIRES_VERTEX_SHADOW_COORD_INTERPOLATOR)
                 float4 shadowCoord              : TEXCOORD7;
                 #endif
-                
 
                 float4 positionCS               : SV_POSITION;
                 UNITY_VERTEX_INPUT_INSTANCE_ID
                 UNITY_VERTEX_OUTPUT_STEREO
             };
-            
+
             CBUFFER_START(UnityPerMaterial)
             float4 _BaseMap_ST;
             half4 _BaseColor;
+
+            uint _LayerCount;
+            float _UVScale01;
+            float _UVScale02;
+            float _UVScale03;
+            float _UVScale04;
+            float _UVScale05;
+            float _UVScale06;
+            float _UVScale07;
+            float _UVScale08;
+            float _UVScale09;
+            float _UVScale10;
+            float _UVScale11;
+            float _UVScale12;
+            float _UVScale13;
+            float _UVScale14;
+            float _UVScale15;
+            float _UVScale16;
+
             half _Cutoff;
             half _BumpScale;
             half _Smoothness;
             half _Metallic;
             half _OcclusionStrength;
-            half _LayerCount;
+            
+            half _HeightTransition;
             CBUFFER_END
+
             TEXTURE2D_ARRAY(_BaseMap);         SAMPLER(sampler_BaseMap);
             TEXTURE2D_ARRAY(_BumpMap);         SAMPLER(sampler_BumpMap);
-            TEXTURE2D(_ControlMap);            SAMPLER(sampler_ControlMap);
-            
-            // inline void TerrainInitialize(Varyings input, out PBRData out_data)
-            // {
-            //     out_data = (PBRData)0;
-            //     float2 uv = input.uv;
-            //     out_data.albedoAlpha = SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, uv);
-            //     out_data.alpha = out_data.albedoAlpha.a * _BaseColor.a;
-            //     #if defined(_ALPHATEST_ON)
-            //     clip(out_data.alpha - _Cutoff);
-            //     #endif
-            //     out_data.albedo = out_data.albedoAlpha.rgb * _BaseColor.rgb;
-            //
-            //     #ifdef _SMAEMAP
-            //     half4 SMAE = SAMPLE_TEXTURE2D(_SMAEMap, sampler_SMAEMap, uv);
-            //     out_data.smoothness = SMAE.r * _Smoothness;
-            //     out_data.metallic = SMAE.g * _Metallic;
-            //     out_data.occlusion = lerp(1.0h, SMAE.b, _OcclusionStrength);
-            //     out_data.emissionColor = _EmissionColor.rgb * SMAE.a * _EmissionStrength;
-            //     #else
-            //     out_data.smoothness = _Smoothness;
-            //     out_data.metallic = _Metallic;
-            //     out_data.occlusion = 1.0h;
-            //     out_data.emissionColor = _EmissionColor.rgb * _EmissionStrength;
-            //     #endif
-            //     
-            //     out_data.positionWS = input.positionWS;
-            //
-            //     #ifdef _NORMALMAP
-            //     half4 normal = SAMPLE_TEXTURE2D(_BumpMap, sampler_BumpMap, uv);
-            //     half3 normalTS = UnpackNormalScale(normal, _BumpScale);
-            //     half3 viewDirWS = half3(input.normalWS.w, input.tangentWS.w, input.bitangentWS.w);
-            //     out_data.TangentToWorld = half3x3(input.tangentWS.xyz, input.bitangentWS.xyz, input.normalWS.xyz);
-            //     out_data.normalWS = TransformTangentToWorld(normalTS, out_data.TangentToWorld);
-            //     #else
-            //     // half3 normalTS = half3(0.0h, 0.0h, 1.0h);
-            //     half3 viewDirWS = input.viewDirWS;
-            //     out_data.TangentToWorld = half3x3(half3(1,0,0),half3(0,1,0),half3(0,0,1));//不会被使用
-            //     out_data.normalWS = input.normalWS;
-            //     #endif
-            //
-            //     out_data.normalWS.rgb = NormalizeNormalPerPixel(out_data.normalWS.rgb);
-            //     out_data.viewDirectionWS = SafeNormalize(viewDirWS);
-            // }
+            TEXTURE2D_ARRAY(_ControlMap);      SAMPLER(sampler_ControlMap);
 
             Varyings vert(Attributes input)
             {
@@ -170,7 +168,8 @@ Shader "KIIF/Terrain"
                 VertexNormalInputs normalInput = GetVertexNormalInputs(input.normalOS, input.tangentOS);
                 half3 viewDirWS = GetCameraPositionWS() - vertexInput.positionWS;
 
-                output.uv = TRANSFORM_TEX(input.texcoord, _BaseMap);
+                // output.uv = TRANSFORM_TEX(input.texcoord, _BaseMap);
+                output.uv = input.texcoord;
 
                 #if defined(_NORMALMAP) || defined(_PARALLAX_ON)
                 output.normalWS = half4(normalInput.normalWS, viewDirWS.x);
@@ -193,11 +192,72 @@ Shader "KIIF/Terrain"
                 output.positionCS = vertexInput.positionCS;
 
                 #ifdef _SCREENPOSITION_ON
-                // output.screenPos = ComputeScreenPos(output.positionCS)/output.positionCS.w; 
-                output.screenPos = vertexInput.positionNDC/output.positionCS.w; 
+                // output.screenPos = ComputeScreenPos(output.positionCS)/output.positionCS.w;
+                output.screenPos = vertexInput.positionNDC/output.positionCS.w;
                 #endif
-                
+
                 return output;
+            }
+
+            void Float4ToFloatArray(float4 base, out float array[4])
+            {
+                array[0] = base.r; // R 分量
+                array[1] = base.g; // G 分量
+                array[2] = base.b; // B 分量
+                array[3] = base.a; // A 分量
+            }
+            inline void SampleControl(float2 uv, out float weight[4][4])
+            {
+                uint countrolCount = ceil(_LayerCount / 4.0f);
+                float4 tempColor;
+                if(countrolCount > 0)
+                {
+                    tempColor = SAMPLE_TEXTURE2D_ARRAY(_ControlMap, sampler_ControlMap, uv, 0);
+                    // control[0] = tempColor;
+                    Float4ToFloatArray(tempColor, weight[0]);
+                    if(countrolCount >= 1)
+                    {
+                        tempColor = SAMPLE_TEXTURE2D_ARRAY(_ControlMap, sampler_ControlMap, uv, 1);
+                        // control[1] = tempColor;
+                        Float4ToFloatArray(tempColor, weight[1]);
+                        if(countrolCount >= 2)
+                        {
+                            tempColor = SAMPLE_TEXTURE2D_ARRAY(_ControlMap, sampler_ControlMap, uv, 2);
+                            // control[2] = tempColor;
+                            Float4ToFloatArray(tempColor, weight[2]);
+                            if(countrolCount >= 3)
+                            {
+                                tempColor = SAMPLE_TEXTURE2D_ARRAY(_ControlMap, sampler_ControlMap, uv, 3);
+                                // control[3] = tempColor;
+                                Float4ToFloatArray(tempColor, weight[3]);
+                            }
+                        }
+                    }
+                }
+            }
+
+            float GetUVScale(uint layerIndex)
+            {
+                switch(layerIndex)
+                {
+                    case 0: return _UVScale01;
+                    case 1: return _UVScale02;
+                    case 2: return _UVScale03;
+                    case 3: return _UVScale04;
+                    case 4: return _UVScale05;
+                    case 5: return _UVScale06;
+                    case 6: return _UVScale07;
+                    case 7: return _UVScale08;
+                    case 8: return _UVScale09;
+                    case 9: return _UVScale10;
+                    case 10: return _UVScale11;
+                    case 11: return _UVScale12;
+                    case 12: return _UVScale13;
+                    case 13: return _UVScale14;
+                    case 14: return _UVScale15;
+                    case 15: return _UVScale16;
+                    default: return 1.0; // 默认值
+                }
             }
 
             struct LayerSample
@@ -206,21 +266,46 @@ Shader "KIIF/Terrain"
                 float3 normal;  // 法线贴图采样结果
             };
 
-            LayerSample SampleLayer(float2 uv, int layerIndex)
+            LayerSample SampleLayer(float2 uv, uint layerIndex)
             {
                 LayerSample result;
 
+                uv *= GetUVScale(layerIndex);
                 // 采样颜色贴图（Texture2DArray）
                 result.albedo = SAMPLE_TEXTURE2D_ARRAY(_BaseMap, sampler_BaseMap, uv, layerIndex);
 
                 #if defined(_NORMALMAP)
                 // 采样法线贴图（Texture2DArray）
                 result.normal = SAMPLE_TEXTURE2D_ARRAY(_BumpMap, sampler_BumpMap, uv, layerIndex).rgb * 2 - 1;
-                #endif                
+                #endif
 
                 return result;
             }
-            
+
+            // 高度混合的基础原理
+            void HeightBasedSplatModify(inout half4 splatControl, in half4 masks[4])
+            {
+                // heights are in mask blue channel, we multiply by the splat Control weights to get combined height
+                half4 splatHeight = half4(masks[0].b, masks[1].b, masks[2].b, masks[3].b) * splatControl.rgba;
+                half maxHeight = max(splatHeight.r, max(splatHeight.g, max(splatHeight.b, splatHeight.a)));
+
+                // Ensure that the transition height is not zero.
+                half transition = max(_HeightTransition, 1e-5);
+
+                // This sets the highest splat to "transition", and everything else to a lower value relative to that, clamping to zero
+                // Then we clamp this to zero and normalize everything
+                half4 weightedHeights = splatHeight + transition - maxHeight.xxxx;
+                weightedHeights = max(0, weightedHeights);
+
+                // We need to add an epsilon here for active layers (hence the blendMask again)
+                // so that at least a layer shows up if everything's too low.
+                weightedHeights = (weightedHeights + 1e-6) * splatControl;
+
+                // Normalize (and clamp to epsilon to keep from dividing by zero)
+                half sumHeight = max(dot(weightedHeights, half4(1, 1, 1, 1)), 1e-6);
+                splatControl = weightedHeights / sumHeight.xxxx;
+            }
+
             half4 frag(Varyings input) : SV_Target
             {
                 UNITY_SETUP_INSTANCE_ID(input);
@@ -233,39 +318,127 @@ Shader "KIIF/Terrain"
                 // TerrainInitialize(input, pbrData);
 
                 // 采样 ControlMap（控制贴图，用于权重混合）
-                float4 control = SAMPLE_TEXTURE2D(_ControlMap, sampler_ControlMap, input.uv);
+                // float4 control[4];
+                LayerSample terrainLayer[16];
+                float weights[4][4];
 
-                float weights[4] = { control.r, control.g, control.b, control.a };
-
-                float4 finalColor = 0;
-                float3 finalNormal = float3(0, 0, 0);
-
-                for (int i = 0; i < _LayerCount; i++)
+                // 初始化 control 和 weights 数组
+                for (uint i = 0; i < 4; i++)
                 {
-                    float weight = weights[i];
-                    
-                    // 调用采样函数
-                    LayerSample layer = SampleLayer(input.uv, i);
+                    // control[i] = float4(0, 0, 0, 0); // 初始化 control 数组
+                    for (uint j = 0; j < 4; j++)
+                    {
+                        weights[i][j] = 0.0; // 初始化 weights 数组
+                    }
+                }
 
-                    // 颜色混合
-                    finalColor += layer.albedo * weight;
+                float2 controlUV = input.uv;
+                #ifdef _BAKEMODE
+                controlUV = TRANSFORM_TEX(input.uv, _BaseMap);
+                #endif
 
+                // SampleControl(controlUV, control, weights);
+                SampleControl(controlUV,  weights);
+
+                // -------------------------------------
+                //采样 初始化
+                float4 mapColor = 0;
+                float3 mapNormal = input.normalWS;
+                float2 baseUV = TRANSFORM_TEX(input.uv, _BaseMap);
+                
+                float maxHeight = 0;
+                float blendHeight[16];
+                float blendWeight[16];
+                uint paintedLayerIndex = 0;
+
+                for(uint i = 0; i < 16; i++)
+                {
+                    blendHeight[i] = 0;
+                }
+
+                // 采样地形的颜色纹理（法线、金属粗糙）
+                for (uint layerIndex = 0; layerIndex < _LayerCount; layerIndex ++)
+                {
+                    uint controlLayer = ceil(layerIndex / 4);
+                    uint index = layerIndex % 4;
+                    float weight = weights[controlLayer][index];
+
+                    if(weight > 0)
+                    {
+                        // 调用采样函数
+                        LayerSample layer = SampleLayer(baseUV, layerIndex);
+
+                        // 高度计算
+                        float tempHeight = weight * layer.albedo.a;
+                        maxHeight = max(maxHeight, tempHeight);         // 高度权重的最大值
+                        blendHeight[paintedLayerIndex] = tempHeight;    // 高度权重
+                        
+                        terrainLayer[paintedLayerIndex] = layer;
+                        blendWeight[paintedLayerIndex] = weight;
+
+                        paintedLayerIndex++;
+                        if(paintedLayerIndex > 16)break;
+
+                        // // 颜色混合
+                        // mapColor += layer.albedo * weight;
+                        //
+                        // #if defined(_NORMALMAP)
+                        // // 法线混合（简单加权，可能需要规范化）
+                        // mapNormal += layer.normal * weight;
+                        // #endif
+                    }                    
+                }
+                
+                // 把有权重的地形，重新计算权重值
+                float sumHeight = 0;
+                _HeightTransition = max(_HeightTransition, 1e-5);
+                for(uint layerIndex = 0; layerIndex < paintedLayerIndex; layerIndex++)
+                {
+                    blendHeight[layerIndex] = max(blendHeight[layerIndex] - maxHeight + _HeightTransition, 0) * blendWeight[layerIndex];
+                    sumHeight += blendHeight[layerIndex];
+                }
+
+                // 混合颜色
+                for(uint layerIndex = 0; layerIndex < paintedLayerIndex; layerIndex++)
+                {
+                    // 权重归一化
+                    half w = blendHeight[layerIndex] / sumHeight;
+                    mapColor += terrainLayer[layerIndex].albedo * w;
                     #if defined(_NORMALMAP)
                     // 法线混合（简单加权，可能需要规范化）
-                    finalNormal += layer.normal * weight;
-                    #endif                    
+                    mapNormal += terrainLayer[layerIndex].normal * w;
+                    #endif
                 }
+                mapColor.a = 1;
+                // return mapColor;
+
+                #ifdef _BAKEMODE
+                return mapColor;
+                #endif
 
                 #if defined(_NORMALMAP)
                 // 法线转换到世界空间
                 half3x3 tangentToWorld = half3x3(input.tangentWS.xyz, input.bitangentWS.xyz, input.normalWS.xyz);
-                finalNormal = TransformTangentToWorld(finalNormal, tangentToWorld);
+                mapNormal = TransformTangentToWorld(mapNormal, tangentToWorld);
                 #endif
-                
 
-                return finalColor;
-                
-                
+                // -------------------------------------
+                //PBR光照
+                BRDFData brdfData = (BRDFData)0;
+                InitializeBRDFData(mapColor.rgb, 0, half3(0.0h, 0.0h, 0.0h), 0, mapColor.a, brdfData);
+
+                float4 shadowCoord = TransformWorldToShadowCoord(input.positionWS);     //主光计算阴影
+                Light mainLight = GetMainLight(shadowCoord);
+                half3 viewDirection = SafeNormalize(GetCameraPositionWS() - input.positionWS);
+                half3 color = LightingPhysicallyBased(brdfData, mainLight, mapNormal, viewDirection);
+                half3 bakedGI = SAMPLE_GI(input.lightmapUV, input.vertexSH, mapNormal);
+                half3 GIcolor = GlobalIllumination(brdfData, bakedGI, 1, mapNormal, viewDirection);
+
+                color += GIcolor;
+
+                return half4(color, 1);
+
+
                 // // -------------------------------------
                 // //PBR光照
                 // BRDFData brdfData = (BRDFData)0;
@@ -285,9 +458,9 @@ Shader "KIIF/Terrain"
                 // #ifdef _ADDITIONAL_LIGHTS
                 // color.rgb += GetAdditionalLightColor(brdfData, pbrData);
                 // #endif
-                
-                // -------------------------------------                
-                
+
+                // -------------------------------------
+
                 // return color;
             }
             ENDHLSL

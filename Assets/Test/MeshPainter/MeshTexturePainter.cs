@@ -1,9 +1,12 @@
+using System;
 using UnityEngine;
 using UnityEditor;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using Unity.Collections;
 using Unity.VisualScripting;
+using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
 
 namespace Tomokin
@@ -11,141 +14,194 @@ namespace Tomokin
     [ExecuteInEditMode]
     public class MeshTexturePainter : MonoBehaviour
     {
-        public List<Texture2D> terrainTextures = new List<Texture2D>(); // 地形纹理列表
-        public List<Texture2D> weightMaps = new List<Texture2D>(); // 权重贴图列表
-        public int selectedTextureIndex = 0; // 选择的地形纹理索引
+        // public List<Texture2D> terrainTextures = new List<Texture2D>(); // 地形纹理列表
+        public List<TerrainTexture> terrainTextures = new List<TerrainTexture>();
+
+        public class TerrainTexture
+        {
+            public Texture2D albedoMap;
+            public Texture2D normalMap;
+            public Texture2D maskMap;
+
+            public TerrainTexture(Texture2D albedo = null)
+            {
+                this.albedoMap = albedo;
+                this.normalMap = null;
+                this.maskMap = null;
+            }
+        }
+
+        public void AddTerrainTexture()
+        {
+            terrainTextures.Add(new TerrainTexture());
+        }
+
+        public void AddTerrainTexture(Texture2D albedoMap)
+        {
+            terrainTextures.Add(new TerrainTexture(albedoMap));
+        }
+
+
+        public Texture2D[] ConvertToPreviewTexture()
+        {
+            List<TerrainTexture> source = terrainTextures;
+            if (source == null || source.Count == 0)
+                return null;
+
+            // 创建一个新的 Texture2D 数组
+            Texture2D[] result = new Texture2D[source.Count];
+
+            for (int i = 0; i < source.Count; i++)
+            {
+                Texture2D originalTexture = source[i].albedoMap;
+                if (originalTexture == null)
+                {
+                    // 如果纹理为空，设置为黑色
+                    Texture2D blackTexture = new Texture2D(2, 2);
+                    Color32 black = new Color32(0, 0, 0, 255);
+                    blackTexture.SetPixels32(new Color32[] { black, black, black, black });
+                    blackTexture.Apply();
+
+                    // result[i] = blackTexture;
+                    originalTexture = blackTexture;
+                }
+
+                // 创建一个 RenderTexture，并将原纹理渲染到其中
+                RenderTexture renderTexture = RenderTexture.GetTemporary(originalTexture.width, originalTexture.height,
+                    0, RenderTextureFormat.ARGB32);
+                Graphics.Blit(originalTexture, renderTexture);
+
+                // 从 RenderTexture 中读取像素数据
+                Texture2D newTexture = new Texture2D(originalTexture.width, originalTexture.height,
+                    TextureFormat.RGBA32, false);
+                RenderTexture previous = RenderTexture.active;
+                RenderTexture.active = renderTexture;
+                newTexture.ReadPixels(new Rect(0, 0, renderTexture.width, renderTexture.height), 0, 0);
+                newTexture.Apply();
+                RenderTexture.active = previous;
+
+                // 释放 RenderTexture
+                RenderTexture.ReleaseTemporary(renderTexture);
+
+                // 获取新纹理的像素数据
+                Color[] pixels = newTexture.GetPixels();
+
+                // 修改 Alpha 通道为 1
+                for (int j = 0; j < pixels.Length; j++)
+                {
+                    pixels[j].a = 1f; // 设置 Alpha 为 1
+                }
+
+                // 将修改后的像素数据应用到新纹理
+                newTexture.SetPixels(pixels);
+                newTexture.Apply(); // 应用更改
+
+                // 将新纹理添加到结果数组中
+                result[i] = newTexture;
+            }
+
+            return result;
+        }
+
+        public Texture2DArray weightMapArray; // 权重贴图列表
+
+        public Texture2D brushTexture; // 笔刷纹理
+
+        private TextureFormat _textureFormat
+        {
+            get => TextureFormat.RGBA32;
+        }
+
+        private RenderTextureFormat _renderTextureFormat
+        {
+            get => RenderTextureFormat.ARGB32;
+        }
+
+        private int selectedTextureIndex = 0; // 选择的地形纹理索引
+
+        public int selectedIndex
+        {
+            get => (terrainTextures.Count > selectedTextureIndex)
+                ? selectedTextureIndex
+                : 0;
+
+            set => selectedTextureIndex = value >= terrainTextures.Count 
+                ? terrainTextures.Count - 1 
+                : value;
+        }
+
         public float brushSize = 0.1f;
         private float brushScale = 1.0f;
         public float brushStrength = 0.5f;
 
         [HideInInspector] public bool isPainting = false;
-        private double lastRepaintTime = 0;
+        private double lastRepaintTime = 0; // 上次刷新的时间
         private const double repaintInterval = 0.03; // 限制 30ms 刷新一次（大约 33FPS）
 
         private Material material;
-        private const int CHANNELS_PER_MAP = 4;     // 每张权重图支持 4 层纹理
+        private const int CHANNELS_PER_MAP = 4; // 每张权重图支持 4 层纹理
+
         public int controlChannels
         {
             get => CHANNELS_PER_MAP;
         }
-        private int weightMapIndex = 0;
-        private int weightMapChannel = 0;
 
-        private int _textureSize = 2048;
+        private int requiredWeightMaps
+        {
+            get => Mathf.CeilToInt(terrainTextures.Count / (float)CHANNELS_PER_MAP);
+        }
+
+        private int weightMapIndex = 0; // 记录是第几个Weight纹理
+        private int weightMapChannel = 0; // 记录是Weight纹理中RGBA哪一个通道
+
+        private int _weightTextureSize = 2048;
+        private int _terrainTextureSize = 1024;
+
         public int TextureSize
         {
-            get => _textureSize; // 读取值
+            get => _weightTextureSize; // 读取值
             set
             {
-                _textureSize = Mathf.Clamp(value, 128, 4096); // 限制范围，防止异常值
-                // Debug.Log($"纹理大小已更新：{_textureSize}");
+                _weightTextureSize = Mathf.Clamp(value, 128, 4096); // 限制范围，防止异常值
+                // Debug.Log($"纹理大小已更新：{_weightTextureSize}");
             }
         }
+
         // TODO 遵循地形烘焙的规则
         private const string CONTROL_MAP_PATH = "Assets/ControlMaps/";
 
+        private string controlMapName
+        {
+            get => gameObject.name + "_Control";
+        }
+
+        private string controlMapPath
+        {
+            get => CONTROL_MAP_PATH + controlMapName + ".asset";
+        }
+
         private ComputeShader brushComputeShader;
-        private Texture2D savedWeightMap;           // 备份贴图
-        private RenderTexture paintRT;              // 记录当前绘制路径
-        private RenderTexture finalWeightRT;        // 记录当前绘制路径
 
-        public bool isDebugMode;
-
-        #region OnDrawGizmos
-
-        private Texture2D rTexture, gTexture, bTexture, aTexture;
-
-        private void UpdateChannelTextures()
-        {
-            if (weightMaps[0] == null) return;
-
-            int width = weightMaps[0].width;
-            int height = weightMaps[0].height;
-
-            // 创建灰度贴图
-            if (rTexture == null) rTexture = new Texture2D(width, height, TextureFormat.RGBA32, false);
-            if (gTexture == null) gTexture = new Texture2D(width, height, TextureFormat.RGBA32, false);
-            if (bTexture == null) bTexture = new Texture2D(width, height, TextureFormat.RGBA32, false);
-            if (aTexture == null) aTexture = new Texture2D(width, height, TextureFormat.RGBA32, false);
-
-            Color[] pixels = weightMaps[0].GetPixels();
-            Color[] rPixels = new Color[pixels.Length];
-            Color[] gPixels = new Color[pixels.Length];
-            Color[] bPixels = new Color[pixels.Length];
-            Color[] aPixels = new Color[pixels.Length];
-
-            for (int i = 0; i < pixels.Length; i++)
-            {
-                float r = pixels[i].r;
-                float g = pixels[i].g;
-                float b = pixels[i].b;
-                float a = pixels[i].a;
-
-                rPixels[i] = new Color(r, r, r, 1);  // 灰度图：R 通道
-                gPixels[i] = new Color(g, g, g, 1);  // 灰度图：G 通道
-                bPixels[i] = new Color(b, b, b, 1);  // 灰度图：B 通道
-                aPixels[i] = new Color(a, a, a, 1);  // 灰度图：A 通道
-            }
-
-            rTexture.SetPixels(rPixels);
-            gTexture.SetPixels(gPixels);
-            bTexture.SetPixels(bPixels);
-            aTexture.SetPixels(aPixels);
-
-            rTexture.Apply();
-            gTexture.Apply();
-            bTexture.Apply();
-            aTexture.Apply();
-        }
-
-        private bool updateDebugGizmos = false;
-        private void OnDrawGizmos()
-        {
-            if (savedWeightMap == null || !isDebugMode) return;
-            if (updateDebugGizmos)
-            {
-                // 更新通道贴图
-                UpdateChannelTextures();
-                updateDebugGizmos = false;
-            }
-
-            Handles.BeginGUI();
-            float size = 128;
-            GUI.DrawTexture(new Rect(10, 10, size, size), savedWeightMap, ScaleMode.ScaleToFit);
-            GUI.Label(new Rect(10, 10 + size, size, 20), "Original");
-
-            GUI.DrawTexture(new Rect(20 + size, 10, size, size), rTexture, ScaleMode.ScaleToFit);
-            GUI.Label(new Rect(20 + size, 10 + size, size, 20), "R Channel");
-
-            GUI.DrawTexture(new Rect(30 + 2 * size, 10, size, size), gTexture, ScaleMode.ScaleToFit);
-            GUI.Label(new Rect(30 + 2 * size, 10 + size, size, 20), "G Channel");
-
-            GUI.DrawTexture(new Rect(40 + 3 * size, 10, size, size), bTexture, ScaleMode.ScaleToFit);
-            GUI.Label(new Rect(40 + 3 * size, 10 + size, size, 20), "B Channel");
-
-            GUI.DrawTexture(new Rect(50 + 4 * size, 10, size, size), aTexture, ScaleMode.ScaleToFit);
-            GUI.Label(new Rect(50 + 4 * size, 10 + size, size, 20), "A Channel");
-
-            Handles.EndGUI();
-        }
-
-        #endregion
+        // private Texture2D savedWeightMap;           // 备份贴图
+        private Texture2DArray backupWeightMapArray; // 备份贴图
+        private RenderTexture paintRT; // 记录当前绘制路径
+        private RenderTexture weightMapArrayRT; // 记录当前绘制路径
 
         private void OnEnable()
         {
-            InitializeComputeShader();
-            InitializeTextures();
-            InitializeBrushScale();
+            InitializeComputeShader(); // 获取绘制使用的ComputeShader
+            InitializeTextures(); // 初始化权重提
+            InitializeBrushScale(); // 根据模型的大小匹配笔刷大小
             SceneView.duringSceneGui += OnSceneGUI;
         }
 
         private void OnDisable()
         {
             SceneView.duringSceneGui -= OnSceneGUI;
-            
-            DestroyImmediate(savedWeightMap);
+
+            DestroyImmediate(backupWeightMapArray);
             DestroyImmediate(paintRT);
-            DestroyImmediate(finalWeightRT);
+            DestroyImmediate(weightMapArrayRT);
         }
 
         private void InitializeComputeShader()
@@ -203,250 +259,221 @@ namespace Tomokin
             }
         }
 
-        private string GetControlMapName(int id, bool isCopy = false)
-        {
-            if (isCopy)
-            {
-                return "ControlMap_" + id + "_copy.png";
-            }
-            else
-            {
-                return "ControlMap_" + id + ".png";
-            }
-        }
+        // private string GetControlMapName(int id, bool isCopy = false)
+        // {
+        //     if (isCopy)
+        //     {
+        //         return "ControlMap_" + id + "_copy.png";
+        //     }
+        //     else
+        //     {
+        //         return "ControlMap_" + id + ".png";
+        //     }
+        // }
 
+        // TODO 应当直接使用Array存储数据
+        /// <summary>
+        /// 把权重图链接到材质上
+        /// </summary>
         public void RelatedToMaterial()
         {
             material = GetComponent<MeshRenderer>().sharedMaterial;
-            if (isDebugMode)
+            if (material.HasProperty("_ControlMap"))
             {
-                material.mainTexture = weightMaps.Count > 0 ? weightMaps[0] : null; // 设置第一张权重图为材质主纹理
+                material.SetTexture("_ControlMap", weightMapArray);
             }
             else
             {
-                if (weightMaps.Count < 0)
-                {
-                    Debug.LogWarning("请点击获取权重图");
-                    return;
-                }
+                Debug.LogWarning("Shader 没有_ControlMap参数");
+            }
 
-                // if (weightMaps[0] == null)
-                // {
-                //     // 尝试重磁盘获取贴图
-                //     UpdateWeightMapsFromDisk();
-                // }
-                if (material.HasProperty("_ControlMap"))
-                {
-                    material.SetTexture("_ControlMap", weightMaps.Count > 0 ? weightMaps[0] : null);
-                }
-                else
-                {
-                    Debug.LogWarning("Shader 没有_ControlMap参数");
-                }
+            if (material.HasProperty("_LayerCount"))
+            {
+                material.SetFloat("_LayerCount", terrainTextures.Count);
             }
         }
-        
+
+        /// <summary>
+        /// 脚本Enable的时候初始化
+        /// </summary>
         private void InitializeTextures()
         {
-            // weightMaps.Clear();
             if (terrainTextures.Count == 0 || GetComponent<MeshRenderer>() == null) return;
 
-            // UpdateWeightMaps();
-            UpdateWeightMapsFromDisk();
+            UpdateWeightMaps();
         }
-        
+
+        /// <summary>
+        /// 保存权重图执行的事件
+        /// </summary>
         public void UpdateWeightMaps()
         {
-            int requiredWeightMaps = Mathf.CeilToInt(terrainTextures.Count / (float)CHANNELS_PER_MAP);
+            Debug.Log("更新权重图。");
 
             if (!Directory.Exists(CONTROL_MAP_PATH))
             {
                 Directory.CreateDirectory(CONTROL_MAP_PATH);
             }
 
-            // 判断weightMaps是否多余
-            for (int i = weightMaps.Count - 1; i >= 0; i--)
+            if (File.Exists(controlMapPath))
             {
-                string texturePath = CONTROL_MAP_PATH + GetControlMapName(i);
-                // 如果weightMaps[i]为空，查找路径下是否有贴图，若没有，创建一个
-                if (weightMaps[i] == null)
+                weightMapArray = LoadTextureArray(controlMapPath);
+                if (weightMapArray != null)
                 {
-                    Texture2D texture = (Texture2D)AssetDatabase.LoadAssetAtPath(texturePath, typeof(Texture2D));
-                    if (texture == null)
+                    if (weightMapArray.depth < requiredWeightMaps)
                     {
-                        texture = CreateNewWeightMap(_textureSize);
-                        SaveTextureAsPNG(texture, texturePath);
-                        texture = (Texture2D)AssetDatabase.LoadAssetAtPath(texturePath, typeof(Texture2D));
-                        weightMaps[i] = texture;
+                        Debug.Log("已有权重图层数不足，扩展层数。");
+                        weightMapArray = ExpandTextureArray(weightMapArray, requiredWeightMaps);
+                        SaveTextureArray(weightMapArray, controlMapPath);
                     }
-                    weightMaps[i] = texture;
-                }
-                // 删除超出数量的内存贴图
-                if (i >= requiredWeightMaps)
-                {
-                    texturePath = CONTROL_MAP_PATH + GetControlMapName(i, true);
-                    // Texture2D newTexture = CreateNewWeightMap(_textureSize);
-                    SaveTextureAsPNG(weightMaps[i], texturePath);
-                    
-                    DestroyImmediate(weightMaps[i], true); // 释放贴图
-                    weightMaps.RemoveAt(i);
-                }
-                else
-                {
-                    // 把内存中的贴图保存到磁盘
-                    // Texture2D newWeightMap = CreateNewWeightMap(_textureSize);
-                    SaveTextureAsPNG(weightMaps[i], texturePath);
-                    weightMaps[i] = (Texture2D)AssetDatabase.LoadAssetAtPath(texturePath, typeof(Texture2D));
+                    else if (weightMapArray.depth > requiredWeightMaps)
+                    {
+                        Debug.Log("已有权重图层数过多，裁剪层数。");
+                        weightMapArray = TrimTextureArray(weightMapArray, requiredWeightMaps);
+                        SaveTextureArray(weightMapArray, controlMapPath);
+                    }
                 }
             }
-
-            // weightMaps不足则添加
-            if (requiredWeightMaps > weightMaps.Count)
+            else
             {
-                for (int i = weightMaps.Count; i < requiredWeightMaps; i++)
-                {
-                    // 贴图不够，创建新的贴图
-                    string texturePath = CONTROL_MAP_PATH + GetControlMapName(i);
-                    Texture2D newWeightMap = CreateNewWeightMap(_textureSize);
-                    SaveTextureAsPNG(newWeightMap, texturePath);
-                    weightMaps.Add(newWeightMap);
-                }
+                Debug.Log("创建新的权重图数组。");
+                weightMapArray = CreateNewTextureArray(requiredWeightMaps);
+                SaveTextureArray(weightMapArray, controlMapPath);
             }
 
+            // 贴图传递到材质球中
             RelatedToMaterial();
         }
 
-        public void UpdateWeightMapsFromDisk()
-        {
-            int requiredWeightMaps = Mathf.CeilToInt(terrainTextures.Count / (float)CHANNELS_PER_MAP);
-            // 从磁盘获取weightMaps，若本地没有则把内存中的东西保存到磁盘，再重新引用磁盘纹理
-            for (int i = 0; i < requiredWeightMaps; i++)
-            {
-                string texturePath = CONTROL_MAP_PATH + GetControlMapName(i);
-                Texture2D texture = (Texture2D)AssetDatabase.LoadAssetAtPath(texturePath, typeof(Texture2D));
-                if (texture == null)
-                {
-                    texture = CreateNewWeightMap(_textureSize);
-                    SaveTextureAsPNG(texture, texturePath);
-                    texture = (Texture2D)AssetDatabase.LoadAssetAtPath(texturePath, typeof(Texture2D));
-                }
+        #region UpdateWeightMaps
 
-                if (weightMaps.Count < i + 1)
-                {
-                    weightMaps.Add(texture);
-                }
-                else
-                {
-                    weightMaps[i] = texture;
-                }
-            }
-            RelatedToMaterial();
-        }
-        
-        public void ClearWeightMaps()
+        private Texture2DArray LoadTextureArray(string path)
         {
-            weightMaps.Clear();
+            return AssetDatabase.LoadAssetAtPath<Texture2DArray>(path);
         }
 
-        public void CheckWeightMapsCount()
+        private Texture2DArray CreateNewTextureArray(int layers)
         {
-            int requiredWeightMaps = Mathf.CeilToInt(terrainTextures.Count / (float)CHANNELS_PER_MAP);
-            if(requiredWeightMaps == weightMaps.Count) return;
-            UpdateWeightMaps();
+            Texture2DArray texArray =
+                new Texture2DArray(_weightTextureSize, _weightTextureSize, layers, _textureFormat, false, true);
+            texArray.wrapMode = TextureWrapMode.Repeat;
+            texArray.filterMode = FilterMode.Bilinear;
+
+            // 第一层填充 1.0 (白色)
+            Color32[] firstLayerPixels = new Color32[_weightTextureSize * _weightTextureSize];
+            for (int i = 0; i < firstLayerPixels.Length; i++)
+                firstLayerPixels[i] = new Color32(255, 0, 0, 0);
+
+            // 其他层填充 0.0 (黑色)
+            Color32[] blackPixels = new Color32[_weightTextureSize * _weightTextureSize];
+            for (int i = 0; i < blackPixels.Length; i++)
+                blackPixels[i] = new Color32(0, 0, 0, 0);
+
+            for (int i = 0; i < layers; i++)
+            {
+                Texture2D tempTex = new Texture2D(_weightTextureSize, _weightTextureSize, _textureFormat, false);
+                tempTex.SetPixels32(i == 0 ? firstLayerPixels : blackPixels);
+                tempTex.Apply();
+                Graphics.CopyTexture(tempTex, 0, 0, texArray, i, 0);
+                DestroyImmediate(tempTex);
+            }
+
+            return texArray;
         }
 
-        /// <summary>
-        /// 创建新的 Weight Map 贴图
-        /// </summary>
-        private Texture2D CreateNewWeightMap(int size)
+        private Texture2DArray ExpandTextureArray(Texture2DArray original, int newLayerCount)
         {
-            // 所有权重图都需要线性
-            Texture2D newTexture = new Texture2D(size, size, TextureFormat.RGBA32, false, true)
-            {
-                wrapMode = TextureWrapMode.Clamp
-            };
+            Texture2DArray newArray =
+                new Texture2DArray(_weightTextureSize, _weightTextureSize, newLayerCount, _textureFormat, false, true);
 
-            Color[] pixels = new Color[size * size];
-            for (int i = 0; i < pixels.Length; i++)
+            int originalLayers = original.depth;
+            for (int i = 0; i < originalLayers; i++)
             {
-                pixels[i] = new Color(0, 0, 0, 0); // 初始化全透明
+                Graphics.CopyTexture(original, i, 0, newArray, i, 0);
             }
 
-            newTexture.SetPixels(pixels);
-            newTexture.Apply();
-            return newTexture;
+            // 额外层填充 0.0 (黑色)
+            Color32[] blackPixels = new Color32[_weightTextureSize * _weightTextureSize];
+            for (int i = 0; i < blackPixels.Length; i++)
+                blackPixels[i] = new Color32(0, 0, 0, 0);
+
+            for (int i = originalLayers; i < newLayerCount; i++)
+            {
+                Texture2D tempTex = new Texture2D(_weightTextureSize, _weightTextureSize, _textureFormat, false);
+                tempTex.SetPixels32(blackPixels);
+                tempTex.Apply();
+                Graphics.CopyTexture(tempTex, 0, 0, newArray, i, 0);
+                Destroy(tempTex);
+            }
+
+            return newArray;
         }
 
-        /// <summary>
-        /// 保存贴图到本地
-        /// </summary>
-        private void SaveTextureAsPNG(Texture2D texture, string path)
+        private Texture2DArray TrimTextureArray(Texture2DArray original, int newLayerCount)
         {
-            Texture2D textureToSave = texture;
+            Texture2DArray newArray =
+                new Texture2DArray(_weightTextureSize, _weightTextureSize, newLayerCount, _textureFormat, false, true);
 
-            // 如果贴图大小不符合 _textureSize，则创建新的
-            if (texture.width != _textureSize || texture.height != _textureSize)
+            for (int i = 0; i < newLayerCount; i++)
             {
-                RenderTexture rt = new RenderTexture(_textureSize, _textureSize, 0, RenderTextureFormat.ARGB32);
-                Graphics.Blit(texture, rt);
-
-                // 创建新的 Texture2D 以存储数据,需要线性
-                textureToSave = new Texture2D(_textureSize, _textureSize, TextureFormat.RGBA32, false, true);
-                RenderTexture.active = rt;
-                textureToSave.ReadPixels(new Rect(0, 0, _textureSize, _textureSize), 0, 0);
-                textureToSave.Apply();
-
-                // 清理 RenderTexture
-                RenderTexture.active = null;
-                rt.Release();
-                DestroyImmediate(rt);
+                Graphics.CopyTexture(original, i, 0, newArray, i, 0);
             }
 
-            // 保存 PNG
-            byte[] bytes = textureToSave.EncodeToPNG();
-            File.WriteAllBytes(path, bytes);
-            AssetDatabase.ImportAsset(path);
-
-            // 确保贴图可读写
-            TextureImporter importer = AssetImporter.GetAtPath(path) as TextureImporter;
-            if (importer != null)
-            {
-                importer.textureType = TextureImporterType.Default;
-                importer.sRGBTexture = false;
-                importer.isReadable = true;
-                importer.mipmapEnabled = false;
-                importer.wrapMode = TextureWrapMode.Repeat;
-                importer.maxTextureSize = _textureSize;
-                
-                TextureImporterPlatformSettings settings = importer.GetDefaultPlatformTextureSettings();
-                settings.resizeAlgorithm = TextureResizeAlgorithm.Mitchell;
-                settings.format = TextureImporterFormat.RGBA32;
-                importer.SetPlatformTextureSettings(settings);
-                
-                importer.SaveAndReimport();
-            }
-
-            // 只有在新创建了 Texture2D 时才销毁它
-            if (textureToSave != texture)
-            {
-                DestroyImmediate(textureToSave);
-            }
+            return newArray;
         }
 
-        public void SaveAllWeightMaps()
+        public void SaveTextureArray()
         {
-            for (int i = 0; i < weightMaps.Count; i++)
-            {
-                string texturePath = CONTROL_MAP_PATH + GetControlMapName(weightMapIndex);
-                SaveTextureAsPNG(weightMaps[i], texturePath);
-            }
+            SaveTextureArray(weightMapArray, controlMapPath);
         }
+
+        private void SaveTextureArray(Texture2DArray texArray, string assetPath)
+        {
+            texArray.name = controlMapName;
+            // 检查该资产是否已经存在
+            Texture2DArray existingAsset = LoadTextureArray(assetPath);
+            if (existingAsset != null)
+            {
+                // 直接覆盖现有的资产数据
+                EditorUtility.CopySerialized(texArray, existingAsset); // 保持 GUID 不变
+            }
+            else
+            {
+                // 如果资源不存在，则创建新的
+                AssetDatabase.CreateAsset(texArray, assetPath);
+            }
+
+            // 保存资产和刷新
+            AssetDatabase.SaveAssets();
+            AssetDatabase.ImportAsset(assetPath, ImportAssetOptions.ForceUpdate);
+            AssetDatabase.Refresh();
+
+            // 异步保存，效果不佳
+            // AsyncEditorSave.SaveAssetAsync(assetPath);
+
+            // 解决保存卡顿的效果不佳
+            // EditorApplication.delayCall += () =>
+            // {
+            //     // 保存资产和刷新
+            //     AssetDatabase.SaveAssets();
+            //     AssetDatabase.ImportAsset(assetPath, ImportAssetOptions.ForceUpdate);
+            //     AssetDatabase.Refresh();
+            //
+            //     Debug.Log($"Texture2DArray 已保存到 {assetPath}");
+            // };
+        }
+
+        #endregion
 
         private void OnSceneGUI(SceneView sceneView)
         {
-            if (!(isPainting && Selection.activeGameObject == gameObject)) return;
+            if (!(isPainting && Selection.activeGameObject == gameObject))
+            {
+                Tools.hidden = false;
+                return;
+            }
 
-            Tools.hidden = true;  // 隐藏移动、旋转、缩放 Gizmo
+            Tools.hidden = true; // 隐藏移动、旋转、缩放 Gizmo
 
             Event e = Event.current;
             if (e == null) return;
@@ -512,7 +539,7 @@ namespace Tomokin
                         // 刷新Handle
                         HandleUtility.Repaint();
                     }
-                    
+
                     if (e.type == EventType.MouseMove)
                     {
                         double currentTime = EditorApplication.timeSinceStartup;
@@ -527,6 +554,8 @@ namespace Tomokin
 
             if (e.type == EventType.MouseUp && e.button == 0)
             {
+                // 绘制
+                OnMouseUp();
                 // TODO Undo笔刷
                 // Undo.RegisterCompleteObjectUndo(weightMaps[weightMapIndex], "Modify Texture");
                 //
@@ -536,17 +565,23 @@ namespace Tomokin
                 //     weightMaps[weightMapIndex].SetPixels(savedWeightMap.GetPixels());
                 //     weightMaps[weightMapIndex].Apply();
                 // };
-                
+
                 // TODO 现在关闭及时保存
                 // string texturePath = CONTROL_MAP_PATH + GetControlMapName(weightMapIndex);
                 // SaveTextureAsPNG(weightMaps[weightMapIndex], texturePath);
+
+
+
                 // 刷新Handle
                 HandleUtility.Repaint();
-                updateDebugGizmos = true;
+                // updateDebugGizmos = true;
             }
             // HandleUtility.Repaint();
         }
 
+        /// <summary>
+        /// 用于更新绘制的通道和纹理数量
+        /// </summary>
         public void SelectTexture(int index)
         {
             if (index >= 0 && index < terrainTextures.Count)
@@ -558,138 +593,50 @@ namespace Tomokin
             }
         }
 
-        //TODO 笔刷样式
-        // public void PaintAtUV(Vector2 uv)
-        // {
-        //     if (weightMaps.Count == 0 || selectedTextureIndex >= terrainTextures.Count) return;
-        //     
-        //     Texture2D weightMap = weightMaps[weightMapIndex];
-        //
-        //     int texWidth = weightMap.width;
-        //     int texHeight = weightMap.height;
-        //
-        //     float brushSizeInPixels = brushSize * brushScale;       // 计算笔刷像素大小
-        //     int startX = Mathf.FloorToInt((uv.x - brushSizeInPixels) * texWidth);
-        //     int startY = Mathf.FloorToInt((uv.y - brushSizeInPixels) * texHeight);
-        //     int endX = Mathf.FloorToInt((uv.x + brushSizeInPixels) * texWidth);
-        //     int endY = Mathf.FloorToInt((uv.y + brushSizeInPixels) * texHeight);
-        //
-        //     Color[] pixels = weightMap.GetPixels();
-        //
-        //     for (int x = startX; x < endX; x++)
-        //     {
-        //         for (int y = startY; y < endY; y++)
-        //         {
-        //             if (x >= 0 && x < texWidth && y >= 0 && y < texHeight)
-        //             {
-        //                 int index = y * texWidth + x;
-        //                 Color pixel = pixels[index];
-        //
-        //                 float weight = Mathf.Clamp01(pixel[weightMapChannel] + brushStrength);
-        //                 pixel[weightMapChannel] = weight;
-        //
-        //                 // 确保所有通道总和不超过 1.0
-        //                 float totalWeight = pixel.r + pixel.g + pixel.b + pixel.a;
-        //                 if (totalWeight > 1.0f)
-        //                 {
-        //                     float scale = 1.0f / totalWeight;
-        //                     pixel.r *= scale;
-        //                     pixel.g *= scale;
-        //                     pixel.b *= scale;
-        //                     pixel.a *= scale;
-        //                 }
-        //
-        //                 pixels[index] = pixel;
-        //             }
-        //         }
-        //     }
-        //
-        //     weightMap.SetPixels(pixels);
-        //     weightMap.Apply(false);
-        // }
-        //
-        public void PaintAtUV(Vector2 uv)
-        {
-            if (weightMaps.Count == 0 || selectedTextureIndex >= terrainTextures.Count) return;
-
-            // RenderTexture weightMap = weightMaps[weightMapIndex]; // 需要转换为 RenderTexture
-            Texture2D weightTexture2D = weightMaps[weightMapIndex];
-            // TODO:不要每帧new RT
-            RenderTexture weightMap = new RenderTexture(weightTexture2D.width, weightTexture2D.height, 0, RenderTextureFormat.ARGB32);
-            weightMap.enableRandomWrite = true;     // 纹理在创建时启用 UAV
-            Graphics.Blit(weightMaps[weightMapIndex], weightMap);
-            int texWidth = weightMap.width;
-            int texHeight = weightMap.height;
-
-            // 设置 Compute Shader 参数
-            brushComputeShader.SetTexture(0, "_WeightMap", weightMap);
-            brushComputeShader.SetInt("_TexWidth", texWidth);
-            brushComputeShader.SetInt("_TexHeight", texHeight);
-            brushComputeShader.SetFloat("_BrushSize", brushSize * brushScale);
-            brushComputeShader.SetFloat("_BrushStrength", brushStrength);
-            brushComputeShader.SetInt("_WeightMapChannel", weightMapChannel);
-            brushComputeShader.SetVector("_UV", new Vector4(uv.x, uv.y, 0, 0));
-
-            // 计算线程组
-            int threadGroupX = Mathf.CeilToInt(texWidth / 8.0f);
-            int threadGroupY = Mathf.CeilToInt(texHeight / 8.0f);
-            brushComputeShader.Dispatch(0, threadGroupX, threadGroupY, 1);
-            
-            // 读取 RenderTexture 回 Texture2D
-            AsyncGPUReadback.Request(weightMap, 0, TextureFormat.ARGB32, request =>
-            {
-                if (request.hasError)
-                {
-                    Debug.LogError("GPU Readback 失败");
-                    return;
-                }
-
-                // 更新 Texture2D
-                weightTexture2D.SetPixelData(request.GetData<byte>(), 0);
-                weightTexture2D.Apply();
-            });
-
-            // 释放 RenderTexture
-            weightMap.Release();
-        }
-        
+        /// <summary>
+        /// 开启编辑开关时，初始化需要实时更新的RT
+        /// </summary>
         public void InitializeRT()
         {
-            Texture2D sourceTexture = weightMaps[weightMapIndex];
-            int texWidth = sourceTexture.width;
-            int texHeight = sourceTexture.height;
-            
-            // 新创建的Texture2D都需要线性
-            savedWeightMap = new Texture2D(texWidth, texHeight, TextureFormat.RGBA32, false, true);
+            backupWeightMapArray =
+                new Texture2DArray(_weightTextureSize, _weightTextureSize, requiredWeightMaps, _textureFormat, false, true);
 
-            // 创建透明的 paintRT
-            paintRT = new RenderTexture(texWidth, texHeight, 0, RenderTextureFormat.ARGB32);
+            paintRT = new RenderTexture(_weightTextureSize, _weightTextureSize, 0, _renderTextureFormat,
+                RenderTextureReadWrite.Linear);
             paintRT.enableRandomWrite = true;
             paintRT.Create();
-            
-            // 暂存每帧混合的结果
-            finalWeightRT = new RenderTexture(texWidth, texHeight, 0, RenderTextureFormat.ARGB32);
-            finalWeightRT.enableRandomWrite = true;
-            finalWeightRT.Create();
+
+            weightMapArrayRT = new RenderTexture(_weightTextureSize, _weightTextureSize, 0, _renderTextureFormat,
+                RenderTextureReadWrite.Linear);
+            weightMapArrayRT.enableRandomWrite = true;
+            weightMapArrayRT.volumeDepth = requiredWeightMaps;
+            weightMapArrayRT.dimension = TextureDimension.Tex2DArray;
+            weightMapArrayRT.Create();
         }
-        
+
+        /// <summary>
+        /// 关闭编辑开关后，清理RT
+        /// </summary>
         public void ClearRT()
         {
-            // 释放内存
-            DestroyImmediate(savedWeightMap);
+            // 删除内存
+            DestroyImmediate(backupWeightMapArray);
             // 释放显存
-            paintRT.Release();
-            finalWeightRT.Release();
+            if (paintRT != null)
+                paintRT.Release();
+            if (weightMapArrayRT != null)
+                weightMapArrayRT.Release();
         }
-        
+
         private void OnMouseDown()
         {
-            if (weightMaps.Count == 0) return;
-            if (savedWeightMap == null || paintRT == null || finalWeightRT == null) InitializeRT();
+            if (weightMapArray.depth == 0 || weightMapArray == null) return;
+
+            if (backupWeightMapArray == null || paintRT == null || weightMapArrayRT == null) InitializeRT();
 
             // 备份当前 weightMap
-            Texture2D sourceTexture = weightMaps[weightMapIndex];
-            Graphics.CopyTexture(sourceTexture, savedWeightMap);
+            Graphics.CopyTexture(weightMapArray, backupWeightMapArray);
+            // SaveTextureArray(backupWeightMapArray, controlMapPath.Replace("_Control", "_1_Control"));
 
             // 初始化 paintRT 为透明
             RenderTexture activeRT = RenderTexture.active;
@@ -697,20 +644,25 @@ namespace Tomokin
             GL.Clear(true, true, Color.clear);
             RenderTexture.active = activeRT;
         }
-        
+
+        /// <summary>
+        /// ComputeShader RT绘制
+        /// </summary>
         private void OnMouseDrag(Vector2 uv)
         {
-            if (weightMaps.Count == 0) return;
-            
+            if (weightMapArray.depth == 0 || weightMapArray == null) return;
+
             int texWidth = paintRT.width;
             int texHeight = paintRT.height;
             int threadGroupX = Mathf.CeilToInt(texWidth / 8.0f);
             int threadGroupY = Mathf.CeilToInt(texHeight / 8.0f);
-            
+
             // ================ 绘制到 paintRT ================ 
             int paintKernel = brushComputeShader.FindKernel("DrawPaintRT");
-            
+
+            brushComputeShader.SetTexture(paintKernel, "_BrushMap", brushTexture);
             brushComputeShader.SetTexture(paintKernel, "_PaintRT", paintRT);
+
             brushComputeShader.SetInt("_TexWidth", texWidth);
             brushComputeShader.SetInt("_TexHeight", texHeight);
             brushComputeShader.SetFloat("_BrushSize", brushSize * brushScale);
@@ -718,34 +670,130 @@ namespace Tomokin
             brushComputeShader.SetVector("_UV", new Vector4(uv.x, uv.y, 0, 0));
 
             brushComputeShader.Dispatch(paintKernel, threadGroupX, threadGroupY, 1);
-            
+
             // ================  混合weightMap RT ================ 
             int blendKernel = brushComputeShader.FindKernel("BlendWeightMaps");
 
-            brushComputeShader.SetTexture(blendKernel, "_SavedWeightMap", savedWeightMap);
-            brushComputeShader.SetTexture(blendKernel, "_PaintMap", paintRT);
-            brushComputeShader.SetTexture(blendKernel, "_FinalWeightMap", finalWeightRT);
-            brushComputeShader.SetInt("_WeightMapChannel", weightMapChannel);
-            
+            brushComputeShader.SetInt("_LayerCount", terrainTextures.Count);
+            brushComputeShader.SetInt("_TargetLayer", selectedTextureIndex);
+            brushComputeShader.SetFloat("_BrushStrength", brushStrength);
+
+            // 传递 3 张纹理
+            brushComputeShader.SetTexture(blendKernel, "_WeightMapArray", backupWeightMapArray); // 只读
+            brushComputeShader.SetTexture(blendKernel, "_PaintMap", paintRT); // 只读
+            brushComputeShader.SetTexture(blendKernel, "_OutputWeightMapArray", weightMapArrayRT); // RW 可写
+
             brushComputeShader.Dispatch(blendKernel, threadGroupX, threadGroupY, 1);
 
-            // 读取回 Texture2D  TextureFormat.RGBA32!!
-            AsyncGPUReadback.Request(finalWeightRT, 0, TextureFormat.RGBA32, request =>
+            // GraphicsFence fence = Graphics.CreateGraphicsFence(GraphicsFenceType.AsyncQueueSynchronisation, SynchronisationStageFlags.PixelProcessing);
+            // Graphics.WaitOnAsyncGraphicsFence(fence);
+            //
+            // Graphics.CopyTexture(weightMapArrayRT, weightMapArray);
+
+            AsyncGPUReadback.Request(weightMapArrayRT, 0, request =>
             {
                 if (request.hasError)
                 {
-                    Debug.LogError("GPU Readback 失败");
+                    Debug.LogError("❌ GPU Readback failed!");
                     return;
                 }
-                weightMaps[weightMapIndex].SetPixelData(request.GetData<byte>(), 0);
-                weightMaps[weightMapIndex].Apply();     // 将CPU 纹理中所做的更改复制到 GPU
+
+                // 计算完成，执行 CopyTexture
+                Graphics.CopyTexture(weightMapArrayRT, weightMapArray);
             });
         }
 
+        private void OnMouseUp()
+        {
+            AsyncGPUReadback.Request(weightMapArrayRT, 0, 0, weightMapArrayRT.width, 0, weightMapArrayRT.height, 0,
+                weightMapArrayRT.volumeDepth, request =>
+                {
+                    if (request.hasError)
+                    {
+                        Debug.LogError("❌ GPU Readback 失败！");
+                        return;
+                    }
+
+                    // 拷贝数据到 Texture2DArray
+                    for (int i = 0; i < weightMapArrayRT.volumeDepth; i++)
+                    {
+                        Color32[] layerPixels = request.GetData<Color32>(i).ToArray();
+                        weightMapArray.SetPixels32(layerPixels, i);
+                    }
+
+                    weightMapArray.Apply();
+
+                    // 保存为 Unity 资源
+                    // SaveTextureArray(weightMapArray, controlMapPath);
+                });
+        }
+
+        /// <summary>
+        /// 把地形纹理打包为Array TODO 应该在添加或删除或替换纹理时自动保存，需要管理路径
+        /// </summary>
         public void SaveTerrainTexturesToTexture2DArray()
         {
             string path = CONTROL_MAP_PATH + "Terrain_Albedo.asset";
-            TextureArrayGenerator.CreateAndSaveTextureArray(terrainTextures, path);
+            List<Texture2D> albedoTextures = terrainTextures.Select(t => t.albedoMap).ToList();
+            TextureArrayGenerator.CreateAndSaveTextureArray(albedoTextures, path, 1024);
+            
+            path = CONTROL_MAP_PATH + "Terrain_Normal.asset";
+            Texture2D defaultNormal = new Texture2D(1, 1, TextureFormat.RGBA32, false);
+            defaultNormal.SetPixel(0, 0, new Color(0.5f, 0.5f, 1f, 1f)); // 标准法线颜色
+            defaultNormal.Apply();
+            // List<Texture2D> normalTextures = terrainTextures.Select(t => t.normalMap).ToList();
+            List<Texture2D> normalTextures =
+                terrainTextures.Select(t => t.normalMap != null ? t.normalMap : defaultNormal).ToList();
+            TextureArrayGenerator.CreateAndSaveTextureArray(normalTextures, path, 1024);
+            
+            path = CONTROL_MAP_PATH + "Terrain_Mask.asset";
+            Texture2D defaultMask = new Texture2D(1, 1, TextureFormat.RGBA32, false);
+            defaultMask.SetPixel(0, 0, new Color(1f, 1f, 1f, 1f)); // 标准法线颜色
+            defaultMask.Apply();
+            List<Texture2D> maskTextures =
+                terrainTextures.Select(t => t.maskMap != null ? t.maskMap : defaultMask).ToList();
+            TextureArrayGenerator.CreateAndSaveTextureArray(maskTextures, path, 1024);
+        }
+
+        /// <summary>
+        /// 异步保存，解决卡顿的问题不佳
+        /// </summary>
+        public static class AsyncEditorSave
+        {
+            private static readonly Queue<string> assetQueue = new Queue<string>();
+            private static bool isSaving = false;
+
+            public static void SaveAssetAsync(string assetPath)
+            {
+                if (!assetQueue.Contains(assetPath))
+                {
+                    assetQueue.Enqueue(assetPath);
+                }
+
+                if (!isSaving)
+                {
+                    isSaving = true;
+                    EditorApplication.update += ProcessSaveQueue;
+                }
+            }
+
+            private static void ProcessSaveQueue()
+            {
+                if (assetQueue.Count > 0)
+                {
+                    string assetPath = assetQueue.Dequeue();
+                    AssetDatabase.ImportAsset(assetPath, ImportAssetOptions.ForceUpdate);
+                    AssetDatabase.SaveAssets();
+                    AssetDatabase.Refresh();
+                    Debug.Log($"异步保存: {assetPath}");
+                }
+                else
+                {
+                    // 没有需要保存的内容，停止更新
+                    EditorApplication.update -= ProcessSaveQueue;
+                    isSaving = false;
+                }
+            }
         }
     }
 }
