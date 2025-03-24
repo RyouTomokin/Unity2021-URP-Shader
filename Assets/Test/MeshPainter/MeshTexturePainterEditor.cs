@@ -18,7 +18,7 @@ namespace Tomokin
         private bool isTextureChangede = false;         // 是否修改了地形纹理
         private Texture2D[] terrainPreview;
         private static readonly int[] TextureSizes = { 128, 256, 512, 1024, 2048, 4096 };
-        
+
         private Texture2D[] terrainBrushes;
         private int selectedBrushIndex;
 
@@ -76,7 +76,7 @@ namespace Tomokin
             Debug.Log($"成功加载 {brushes.Length} 个笔刷！");
             return brushes;
         }
-        
+
         public override void OnInspectorGUI()
         {
             serializedObject.Update();
@@ -88,7 +88,7 @@ namespace Tomokin
 
             EditorGUILayout.Space();
 
-            if (painter.terrainTextures != null && painter.weightMapArray != null)
+            if (painter.terrainTextures != null)
             {
                 // ================ 绘制模式开关 ================
                 GUILayout.BeginHorizontal();
@@ -97,14 +97,14 @@ namespace Tomokin
                 painter.isPainting = GUILayout.Toggle(painter.isPainting, editIcon, "Button",
                     GUILayout.Width(35), GUILayout.Height(25));
                 // 检测 Toggle 是否被按下或松开
-                if (oldValue != painter.isPainting) 
+                if (oldValue != painter.isPainting)
                 {
-                    if (painter.isPainting) 
+                    if (painter.isPainting)
                     {
                         // 初始化RT
                         painter.InitializeRT();
                     }
-                    else 
+                    else
                     {
                         // 卸载RT
                         painter.ClearRT();
@@ -122,7 +122,7 @@ namespace Tomokin
                 GUILayout.EndHorizontal();
 
                 EditorGUILayout.Space();
-                
+
                 // ================ 画笔设置 ================
                 painter.brushSize = EditorGUILayout.Slider("画笔大小", painter.brushSize, 0.01f, 10f);
                 painter.brushStrength = EditorGUILayout.Slider("画笔强度", painter.brushStrength, 0.01f, 1f);
@@ -168,7 +168,7 @@ namespace Tomokin
                 }
                 GUI.enabled = true;
                 GUILayout.EndHorizontal();
-                
+
                 // **显示纹理列表**
                 if (textureCount > 0 && terrainPreview != null && terrainPreview.Length > 0)
                 {
@@ -185,14 +185,14 @@ namespace Tomokin
                         sIndex = newTextureIndex;
                         EditorUtility.SetDirty(painter);
                     }
-                    
+
                     // **纹理信息**
                     if (painter.terrainTextures.Count > 0)
                     {
                         EditorGUILayout.BeginVertical("box");
                         // 开始监视所有贴图槽的更改
                         EditorGUI.BeginChangeCheck();
-                    
+
                         EditorGUILayout.BeginHorizontal();
                         EditorGUILayout.LabelField("Albedo Map", GUILayout.Width(100));
                         GUILayout.FlexibleSpace(); // 添加弹性间距，让右侧贴图槽靠近 Inspector 右侧
@@ -201,7 +201,7 @@ namespace Tomokin
                             GUILayout.Width(72), GUILayout.Height(72));
                         painter.terrainTextures[sIndex].albedoMap = albedo;
                         EditorGUILayout.EndHorizontal();
-                    
+
                         EditorGUILayout.BeginHorizontal();
                         EditorGUILayout.LabelField("Normal Map", GUILayout.Width(100));
                         GUILayout.FlexibleSpace(); // 添加弹性间距，让右侧贴图槽靠近 Inspector 右侧
@@ -210,7 +210,7 @@ namespace Tomokin
                             GUILayout.Width(72), GUILayout.Height(72));
                         painter.terrainTextures[sIndex].normalMap = normal;
                         EditorGUILayout.EndHorizontal();
-                    
+
                         EditorGUILayout.BeginHorizontal();
                         EditorGUILayout.LabelField("Mask Map", GUILayout.Width(100));
                         GUILayout.FlexibleSpace(); // 添加弹性间距，让右侧贴图槽靠近 Inspector 右侧
@@ -219,7 +219,7 @@ namespace Tomokin
                             GUILayout.Width(72), GUILayout.Height(72));
                         painter.terrainTextures[sIndex].maskMap = mask;
                         EditorGUILayout.EndHorizontal();
-                    
+
                         if (EditorGUI.EndChangeCheck())
                         {
                             Undo.RecordObject(painter, "Modify Terrain Texture");
@@ -230,7 +230,7 @@ namespace Tomokin
                             EditorUtility.SetDirty(painter); // 标记 Painter 需要保存
                             Debug.Log("贴图修改了！");
                         }
-                        
+
                         EditorGUILayout.EndVertical();
                     }
                 }
@@ -276,7 +276,7 @@ namespace Tomokin
                     terrainPreview = painter.ConvertToPreviewTexture();
                     isTextureChangede = false;
                 }
-                
+
                 // ================ 绘制笔刷纹理 ================
                 EditorGUILayout.LabelField("地形笔刷", EditorStyles.boldLabel);
                 if (terrainBrushes != null && terrainBrushes.Length > 0)
@@ -306,46 +306,51 @@ namespace Tomokin
 
                 // ================ 权重贴图信息 ================
                 EditorGUILayout.LabelField("权重贴图", EditorStyles.boldLabel);
-                EditorGUI.BeginDisabledGroup(true);
-                EditorGUILayout.IntField("权重贴图数量", painter.weightMapArray.depth);
-                EditorGUI.EndDisabledGroup();
-                // EditorGUILayout.IntField("权重贴图尺寸", painter.TextureSize);
-                // 获取当前 TextureSize 在数组中的索引
-                int selectedIndex = Mathf.Max(0, System.Array.IndexOf(TextureSizes, painter.TextureSize));
-                // 创建可编辑的下拉菜单
-                selectedIndex = EditorGUILayout.Popup("权重贴图尺寸", selectedIndex, TextureSizes.Select(size => size.ToString()).ToArray());
-                painter.TextureSize = TextureSizes[selectedIndex];
-                
-                GUILayout.BeginHorizontal();
-                if (GUILayout.Button("保存权重图", GUILayout.Width(150)))
+
+                if(painter.weightMapArray == null)
                 {
-                    painter.UpdateWeightMaps();
-                    // 如果正处在编辑模式，重新初始化RT
-                    if (painter.isPainting)
+                    EditorGUILayout.HelpBox("地形纹理或权重贴图未设置！", MessageType.Warning);
+                    int selectedSizeIndex = Mathf.Max(0, System.Array.IndexOf(TextureSizes, painter.TextureSize));
+                    selectedSizeIndex = EditorGUILayout.Popup("权重贴图尺寸", selectedSizeIndex, TextureSizes.Select(size => size.ToString()).ToArray());
+                    painter.TextureSize = TextureSizes[selectedSizeIndex];
+                    if (GUILayout.Button("新建权重图", GUILayout.Width(150)))
                     {
-                        painter.ClearRT();
-                        painter.InitializeRT();
+                        painter.UpdateWeightMaps();
                     }
                 }
-                GUILayout.EndHorizontal();
-
-                if (GUILayout.Button("保存地形纹理为图集", GUILayout.Width(150)))
+                else
                 {
-                    painter.SaveTerrainTexturesToTexture2DArray();
+                    EditorGUI.BeginDisabledGroup(true);
+                    EditorGUILayout.IntField("权重贴图数量", painter.weightMapArray.depth);
+                    EditorGUI.EndDisabledGroup();
+                    // EditorGUILayout.IntField("权重贴图尺寸", painter.TextureSize);
+                    // 获取当前 TextureSize 在数组中的索引
+                    int selectedIndex = Mathf.Max(0, System.Array.IndexOf(TextureSizes, painter.TextureSize));
+                    // 创建可编辑的下拉菜单
+                    selectedIndex = EditorGUILayout.Popup("权重贴图尺寸", selectedIndex,
+                        TextureSizes.Select(size => size.ToString()).ToArray());
+                    painter.TextureSize = TextureSizes[selectedIndex];
+
+                    GUILayout.BeginHorizontal();
+                    if (GUILayout.Button("保存权重图", GUILayout.Width(150)))
+                    {
+                        painter.UpdateWeightMaps();
+                        // 如果正处在编辑模式，重新初始化RT
+                        if (painter.isPainting)
+                        {
+                            painter.ClearRT();
+                            painter.InitializeRT();
+                        }
+                    }
+
+                    GUILayout.EndHorizontal();
+
+                    if (GUILayout.Button("保存地形纹理为图集", GUILayout.Width(150)))
+                    {
+                        painter.SaveTerrainTexturesToTexture2DArray();
+                    }
                 }
             }
-            else
-            {
-                EditorGUILayout.HelpBox("地形纹理或权重贴图未设置！", MessageType.Warning);
-                int selectedIndex = Mathf.Max(0, System.Array.IndexOf(TextureSizes, painter.TextureSize));
-                selectedIndex = EditorGUILayout.Popup("权重贴图尺寸", selectedIndex, TextureSizes.Select(size => size.ToString()).ToArray());
-                painter.TextureSize = TextureSizes[selectedIndex];
-                if (GUILayout.Button("新建权重图", GUILayout.Width(150)))
-                {
-                    painter.UpdateWeightMaps();
-                }
-            }
-
             serializedObject.ApplyModifiedProperties();
         }
     }

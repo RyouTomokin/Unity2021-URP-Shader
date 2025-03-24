@@ -11,6 +11,7 @@ using UnityEngine.Rendering;
 
 namespace Tomokin
 {
+    [RequireComponent(typeof(MeshCollider))]
     [ExecuteInEditMode]
     public class MeshTexturePainter : MonoBehaviour
     {
