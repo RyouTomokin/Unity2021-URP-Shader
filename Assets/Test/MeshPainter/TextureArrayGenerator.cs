@@ -47,7 +47,6 @@ namespace Tomokin
                 // 手动解压 贴图 到 RGBA32
                 Texture2D tempTexture = new Texture2D(width, height, format, false);
                 // Debug.LogError($"Texture {i} has a different size! Rescale required.");
-                tempTexture = new Texture2D(width, height, format, false);
                 RenderTexture rt = RenderTexture.GetTemporary(width, height, 0);
             
                 Graphics.Blit(sourceTex, rt);

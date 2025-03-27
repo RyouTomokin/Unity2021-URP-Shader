@@ -1,0 +1,70 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!21 &2100000
+Material:
+  serializedVersion: 8
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: KIIF_Terrain
+  m_Shader: {fileID: 4800000, guid: e7aa27082ca23b04e85096a68dbadc6d, type: 3}
+  m_ValidKeywords:
+  - _NORMALMAP
+  - _SMAEMAP
+  m_InvalidKeywords: []
+  m_LightmapFlags: 4
+  m_EnableInstancingVariants: 0
+  m_DoubleSidedGI: 0
+  m_CustomRenderQueue: 2000
+  stringTagMap: {}
+  disabledShaderPasses: []
+  m_SavedProperties:
+    serializedVersion: 3
+    m_TexEnvs:
+    - _BaseMap:
+        m_Texture: {fileID: 18700000, guid: 9bc0468596c34cf4689171e81423a885, type: 2}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _BumpMap:
+        m_Texture: {fileID: 18700000, guid: 0817aa7c35ead7c49af3845b15f307dc, type: 2}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _ControlMap:
+        m_Texture: {fileID: 18700000, guid: c4a15c5c8df8d3844bd306c92f6e6a60, type: 2}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _SMAEMap:
+        m_Texture: {fileID: 18700000, guid: 1af2ecfd10afa5b48b3bc51c31d4c9a4, type: 2}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    m_Ints: []
+    m_Floats:
+    - _AlphaTest: 0
+    - _BumpScale: 1
+    - _Cutoff: 0.5
+    - _DoubleSide: 0
+    - _HeightTransition: 0.3
+    - _LayerCount: 7
+    - _Metallic: 1
+    - _OcclusionStrength: 1
+    - _Smoothness: 1
+    - _UVScale01: 8
+    - _UVScale02: 11.54
+    - _UVScale03: 10.15
+    - _UVScale04: 11
+    - _UVScale05: 12
+    - _UVScale06: 13
+    - _UVScale07: 14
+    - _UVScale08: 9
+    - _UVScale09: 9
+    - _UVScale10: 9
+    - _UVScale11: 9
+    - _UVScale12: 9
+    - _UVScale13: 9
+    - _UVScale14: 9
+    - _UVScale15: 1
+    - _UVScale16: 1
+    m_Colors:
+    - _BaseColor: {r: 1, g: 1, b: 1, a: 1}
+  m_BuildTextureStacks: []

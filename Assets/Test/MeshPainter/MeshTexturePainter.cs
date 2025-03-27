@@ -17,91 +17,35 @@ namespace Tomokin
     {
         // public List<Texture2D> terrainTextures = new List<Texture2D>(); // 地形纹理列表
         public List<TerrainTexture> terrainTextures = new List<TerrainTexture>();
+        public Texture2D[] terrainPreview;
 
+        [Serializable]
         public class TerrainTexture
         {
             public Texture2D albedoMap;
             public Texture2D normalMap;
             public Texture2D maskMap;
+            public float tilling;
 
             public TerrainTexture(Texture2D albedo = null)
             {
                 this.albedoMap = albedo;
                 this.normalMap = null;
                 this.maskMap = null;
+                this.tilling = 1;
             }
         }
 
         public void AddTerrainTexture()
         {
-            terrainTextures.Add(new TerrainTexture());
+            // terrainTextures.Add(new TerrainTexture());
+            terrainTextures.Insert(selectedIndex + 1, new TerrainTexture());
+            selectedIndex++;
         }
 
         public void AddTerrainTexture(Texture2D albedoMap)
         {
             terrainTextures.Add(new TerrainTexture(albedoMap));
-        }
-
-
-        public Texture2D[] ConvertToPreviewTexture()
-        {
-            List<TerrainTexture> source = terrainTextures;
-            if (source == null || source.Count == 0)
-                return null;
-
-            // 创建一个新的 Texture2D 数组
-            Texture2D[] result = new Texture2D[source.Count];
-
-            for (int i = 0; i < source.Count; i++)
-            {
-                Texture2D originalTexture = source[i].albedoMap;
-                if (originalTexture == null)
-                {
-                    // 如果纹理为空，设置为黑色
-                    Texture2D blackTexture = new Texture2D(2, 2);
-                    Color32 black = new Color32(0, 0, 0, 255);
-                    blackTexture.SetPixels32(new Color32[] { black, black, black, black });
-                    blackTexture.Apply();
-
-                    // result[i] = blackTexture;
-                    originalTexture = blackTexture;
-                }
-
-                // 创建一个 RenderTexture，并将原纹理渲染到其中
-                RenderTexture renderTexture = RenderTexture.GetTemporary(originalTexture.width, originalTexture.height,
-                    0, RenderTextureFormat.ARGB32);
-                Graphics.Blit(originalTexture, renderTexture);
-
-                // 从 RenderTexture 中读取像素数据
-                Texture2D newTexture = new Texture2D(originalTexture.width, originalTexture.height,
-                    TextureFormat.RGBA32, false);
-                RenderTexture previous = RenderTexture.active;
-                RenderTexture.active = renderTexture;
-                newTexture.ReadPixels(new Rect(0, 0, renderTexture.width, renderTexture.height), 0, 0);
-                newTexture.Apply();
-                RenderTexture.active = previous;
-
-                // 释放 RenderTexture
-                RenderTexture.ReleaseTemporary(renderTexture);
-
-                // 获取新纹理的像素数据
-                Color[] pixels = newTexture.GetPixels();
-
-                // 修改 Alpha 通道为 1
-                for (int j = 0; j < pixels.Length; j++)
-                {
-                    pixels[j].a = 1f; // 设置 Alpha 为 1
-                }
-
-                // 将修改后的像素数据应用到新纹理
-                newTexture.SetPixels(pixels);
-                newTexture.Apply(); // 应用更改
-
-                // 将新纹理添加到结果数组中
-                result[i] = newTexture;
-            }
-
-            return result;
         }
 
         public Texture2DArray weightMapArray; // 权重贴图列表
@@ -136,10 +80,40 @@ namespace Tomokin
         public float brushStrength = 0.5f;
 
         [HideInInspector] public bool isPainting = false;
+        [HideInInspector] public bool isSavedWeight = false;
         private double lastRepaintTime = 0; // 上次刷新的时间
         private const double repaintInterval = 0.03; // 限制 30ms 刷新一次（大约 33FPS）
 
-        private Material material;
+        private Material _material;
+
+        private Material material
+        {
+            get
+            {
+                if (_material == null)
+                {
+                    _material = GetComponent<MeshRenderer>()?.sharedMaterial;
+                }
+                return _material;
+            }
+            set
+            {
+                _material = value;
+                if (_material != null)
+                {
+                    // 获取材质完整路径
+                    string fullPath = AssetDatabase.GetAssetPath(_material);
+                    // 仅获取所在文件夹路径
+                    CONTROL_MAP_PATH = Path.GetDirectoryName(fullPath).Replace("\\", "/") + "/";
+
+                    Debug.Log("材质路径已更新: " + CONTROL_MAP_PATH);
+                }
+                else
+                {
+                    CONTROL_MAP_PATH = null;
+                }
+            }
+        }
         private const int CHANNELS_PER_MAP = 4; // 每张权重图支持 4 层纹理
 
         public int controlChannels
@@ -168,18 +142,17 @@ namespace Tomokin
             }
         }
 
-        // TODO 遵循地形烘焙的规则
-        private const string CONTROL_MAP_PATH = "Assets/ControlMaps/";
+        // 会随着材质球的路径变化而变化
+        private string CONTROL_MAP_PATH = "Assets/ControlMaps/";
 
-        private string controlMapName
-        {
-            get => gameObject.name + "_Control";
-        }
-
-        private string controlMapPath
-        {
-            get => CONTROL_MAP_PATH + controlMapName + ".asset";
-        }
+        private string controlMapName => gameObject.name + "_Control";
+        private string controlMapPath => CONTROL_MAP_PATH + controlMapName + ".asset";
+        private string albedoMapName => gameObject.name + "_D";     // Albedo
+        private string albedoMapPath => CONTROL_MAP_PATH + albedoMapName + ".asset";
+        private string normalMapName => gameObject.name + "_N";     // Normal
+        private string normalMapPath => CONTROL_MAP_PATH + normalMapName + ".asset";
+        private string maskMapName => gameObject.name + "_SM";      // Mask
+        private string maskMapPath => CONTROL_MAP_PATH + maskMapName + ".asset";
 
         private ComputeShader brushComputeShader;
 
@@ -190,9 +163,9 @@ namespace Tomokin
 
         private void OnEnable()
         {
-            InitializeComputeShader(); // 获取绘制使用的ComputeShader
-            InitializeTextures(); // 初始化权重提
-            InitializeBrushScale(); // 根据模型的大小匹配笔刷大小
+            InitializeComputeShader();  // 获取绘制使用的ComputeShader
+            InitializeTextures();       // 初始化权重贴图
+            InitializeBrushScale();     // 根据模型的大小匹配笔刷大小
             SceneView.duringSceneGui += OnSceneGUI;
         }
 
@@ -278,7 +251,11 @@ namespace Tomokin
         /// </summary>
         public void RelatedToMaterial()
         {
-            material = GetComponent<MeshRenderer>().sharedMaterial;
+            // material = GetComponent<MeshRenderer>().sharedMaterial;
+            if (weightMapArray == null)
+            {
+                Debug.LogError("shikongde");
+            }
             if (material.HasProperty("_ControlMap"))
             {
                 material.SetTexture("_ControlMap", weightMapArray);
@@ -292,6 +269,10 @@ namespace Tomokin
             {
                 material.SetFloat("_LayerCount", terrainTextures.Count);
             }
+            // 标记材质为“脏”（表示已修改）
+            EditorUtility.SetDirty(material);
+            // 保存修改到磁盘
+            AssetDatabase.SaveAssets();
         }
 
         /// <summary>
@@ -300,6 +281,11 @@ namespace Tomokin
         private void InitializeTextures()
         {
             if (terrainTextures.Count == 0 || GetComponent<MeshRenderer>() == null) return;
+            
+            // 获取材质完整路径
+            string fullPath = AssetDatabase.GetAssetPath(_material);
+            // 仅获取所在文件夹路径
+            CONTROL_MAP_PATH = Path.GetDirectoryName(fullPath).Replace("\\", "/") + "/";
 
             UpdateWeightMaps();
         }
@@ -404,7 +390,7 @@ namespace Tomokin
                 tempTex.SetPixels32(blackPixels);
                 tempTex.Apply();
                 Graphics.CopyTexture(tempTex, 0, 0, newArray, i, 0);
-                Destroy(tempTex);
+                DestroyImmediate(tempTex);
             }
 
             return newArray;
@@ -423,8 +409,9 @@ namespace Tomokin
             return newArray;
         }
 
-        public void SaveTextureArray()
+        public void SaveWeightTextureArray()
         {
+            if (weightMapArray == null) return;
             SaveTextureArray(weightMapArray, controlMapPath);
         }
 
@@ -449,6 +436,7 @@ namespace Tomokin
             AssetDatabase.ImportAsset(assetPath, ImportAssetOptions.ForceUpdate);
             AssetDatabase.Refresh();
 
+            weightMapArray = LoadTextureArray(assetPath);
             // 异步保存，效果不佳
             // AsyncEditorSave.SaveAssetAsync(assetPath);
 
@@ -471,10 +459,17 @@ namespace Tomokin
             if (!(isPainting && Selection.activeGameObject == gameObject))
             {
                 Tools.hidden = false;
+                // 如果从选中对象变为其他或者关闭绘制，保存一次权重图
+                if (!isSavedWeight)
+                {
+                    SaveWeightTextureArray();
+                    isSavedWeight = true;
+                }
                 return;
             }
 
             Tools.hidden = true; // 隐藏移动、旋转、缩放 Gizmo
+            isSavedWeight = false;
 
             Event e = Event.current;
             if (e == null) return;
@@ -577,6 +572,16 @@ namespace Tomokin
                 HandleUtility.Repaint();
                 // updateDebugGizmos = true;
             }
+            
+            if (Event.current.type == EventType.KeyUp && 
+                Event.current.control && 
+                Event.current.keyCode == KeyCode.S)
+            {
+                Debug.Log("检测到 Ctrl+S，保存纹理数据...");
+                SaveTerrainTexturesToTexture2DArray();          // 添加新层后保存一遍
+                UpdateWeightMaps();                             // 添加新层后刷新权重图
+                ConvertToPreviewTexture();
+            }
             // HandleUtility.Repaint();
         }
 
@@ -593,6 +598,70 @@ namespace Tomokin
                 weightMapChannel = selectedTextureIndex % CHANNELS_PER_MAP;
             }
         }
+        
+        public Texture2D[] ConvertToPreviewTexture()
+        {
+            List<TerrainTexture> source = terrainTextures;
+            if (source == null || source.Count == 0)
+                return null;
+
+            // 创建一个新的 Texture2D 数组
+            Texture2D[] result = new Texture2D[source.Count];
+
+            for (int i = 0; i < source.Count; i++)
+            {
+                Texture2D originalTexture = source[i].albedoMap;
+                if (originalTexture == null)
+                {
+                    // 如果纹理为空，设置为黑色
+                    Texture2D blackTexture = new Texture2D(2, 2);
+                    Color32 black = new Color32(0, 0, 0, 255);
+                    blackTexture.SetPixels32(new Color32[] { black, black, black, black });
+                    blackTexture.Apply();
+
+                    // result[i] = blackTexture;
+                    originalTexture = blackTexture;
+                }
+
+                // 创建一个 RenderTexture，并将原纹理渲染到其中
+                RenderTexture renderTexture = RenderTexture.GetTemporary(originalTexture.width, originalTexture.height,
+                    0, RenderTextureFormat.ARGB32);
+                Graphics.Blit(originalTexture, renderTexture);
+
+                // 从 RenderTexture 中读取像素数据
+                Texture2D newTexture = new Texture2D(originalTexture.width, originalTexture.height,
+                    _textureFormat, false);
+                RenderTexture previous = RenderTexture.active;
+                RenderTexture.active = renderTexture;
+                newTexture.ReadPixels(new Rect(0, 0, renderTexture.width, renderTexture.height), 0, 0);
+                newTexture.Apply();
+                RenderTexture.active = previous;
+
+                // 释放 RenderTexture
+                RenderTexture.ReleaseTemporary(renderTexture);
+
+                // 获取新纹理的像素数据
+                Color[] pixels = newTexture.GetPixels();
+
+                // 修改 Alpha 通道为 1
+                for (int j = 0; j < pixels.Length; j++)
+                {
+                    pixels[j].a = 1f; // 设置 Alpha 为 1
+                }
+
+                // 将修改后的像素数据应用到新纹理
+                newTexture.SetPixels(pixels);
+                newTexture.Apply(); // 应用更改
+
+                // 将新纹理添加到结果数组中
+                result[i] = newTexture;
+            }
+
+            terrainPreview = result;
+
+            return result;
+        }
+
 
         /// <summary>
         /// 开启编辑开关时，初始化需要实时更新的RT
@@ -635,6 +704,7 @@ namespace Tomokin
 
             if (backupWeightMapArray == null || paintRT == null || weightMapArrayRT == null) InitializeRT();
 
+            Undo.RegisterCompleteObjectUndo(weightMapArray, "Modify WeightMapArray");
             // 备份当前 weightMap
             Graphics.CopyTexture(weightMapArray, backupWeightMapArray);
             // SaveTextureArray(backupWeightMapArray, controlMapPath.Replace("_Control", "_1_Control"));
@@ -723,6 +793,7 @@ namespace Tomokin
                     }
 
                     weightMapArray.Apply();
+                    // EditorUtility.SetDirty(weightMapArray);
 
                     // 保存为 Unity 资源
                     // SaveTextureArray(weightMapArray, controlMapPath);
@@ -734,27 +805,145 @@ namespace Tomokin
         /// </summary>
         public void SaveTerrainTexturesToTexture2DArray()
         {
-            string path = CONTROL_MAP_PATH + "Terrain_Albedo.asset";
             List<Texture2D> albedoTextures = terrainTextures.Select(t => t.albedoMap).ToList();
-            TextureArrayGenerator.CreateAndSaveTextureArray(albedoTextures, path, 1024);
-            
-            path = CONTROL_MAP_PATH + "Terrain_Normal.asset";
-            Texture2D defaultNormal = new Texture2D(1, 1, TextureFormat.RGBA32, false);
+            TextureArrayGenerator.CreateAndSaveTextureArray(albedoTextures, albedoMapPath, _terrainTextureSize);
+
+            Texture2D defaultNormal = new Texture2D(1, 1, _textureFormat, false);
             defaultNormal.SetPixel(0, 0, new Color(0.5f, 0.5f, 1f, 1f)); // 标准法线颜色
             defaultNormal.Apply();
             // List<Texture2D> normalTextures = terrainTextures.Select(t => t.normalMap).ToList();
             List<Texture2D> normalTextures =
                 terrainTextures.Select(t => t.normalMap != null ? t.normalMap : defaultNormal).ToList();
-            TextureArrayGenerator.CreateAndSaveTextureArray(normalTextures, path, 1024);
-            
-            path = CONTROL_MAP_PATH + "Terrain_Mask.asset";
-            Texture2D defaultMask = new Texture2D(1, 1, TextureFormat.RGBA32, false);
+            TextureArrayGenerator.CreateAndSaveTextureArray(normalTextures, normalMapPath, _terrainTextureSize);
+
+            Texture2D defaultMask = new Texture2D(1, 1, _textureFormat, false);
             defaultMask.SetPixel(0, 0, new Color(1f, 1f, 1f, 1f)); // 标准法线颜色
             defaultMask.Apply();
             List<Texture2D> maskTextures =
                 terrainTextures.Select(t => t.maskMap != null ? t.maskMap : defaultMask).ToList();
-            TextureArrayGenerator.CreateAndSaveTextureArray(maskTextures, path, 1024);
+            TextureArrayGenerator.CreateAndSaveTextureArray(maskTextures, maskMapPath, _terrainTextureSize);
+
+            // ================ 把纹理传入材质球 ================
+            // material = GetComponent<MeshRenderer>().sharedMaterial;
+            Texture2DArray tempLoadTextureArray = LoadTextureArray(albedoMapPath);
+            if (material.HasProperty("_BaseMap"))
+                material.SetTexture("_BaseMap", tempLoadTextureArray);
+            else
+                Debug.LogWarning("Shader 没有_BaseMap参数");
+
+            tempLoadTextureArray = LoadTextureArray(normalMapPath);
+            if (material.HasProperty("_BumpMap"))
+                material.SetTexture("_BumpMap", tempLoadTextureArray);
+            else
+                Debug.LogWarning("Shader 没有_BumpMap参数");
+
+            tempLoadTextureArray = LoadTextureArray(maskMapPath);
+            if (material.HasProperty("_SMAEMap"))
+                material.SetTexture("_SMAEMap", tempLoadTextureArray);
+            else
+                Debug.LogWarning("Shader 没有_SMAEMap参数");
+            
+            // 标记材质为“脏”（表示已修改）
+            EditorUtility.SetDirty(material);
+            // 保存修改到磁盘
+            AssetDatabase.SaveAssets();
         }
+
+        #region UpadateTerrainLayer
+
+        public void UpdateTiling(int index)
+        {
+            if (material == null)
+            {
+                return;
+            }
+
+            string paramName = $"_UVScale{index+1:D2}";
+            if (material.HasProperty(paramName))
+            {
+                material.SetFloat(paramName, terrainTextures[index].tilling);
+            }
+            else
+            {
+                Debug.LogWarning($"没有参数:{paramName}");
+            }
+        }
+        public void UpdateAlbedoInArray(Texture2D newTexture)
+        {
+            if (newTexture == null)
+            {
+                Debug.LogWarning($"Texture at index {selectedIndex} is null, using a black texture.");
+                newTexture = new Texture2D(1, 1, _textureFormat, false);
+                newTexture.SetPixel(0, 0, Color.black);
+                newTexture.Apply();
+            }
+            UpdateTextureInArray(newTexture, selectedIndex, albedoMapPath);
+        }
+        public void UpdateNormalInArray(Texture2D newTexture)
+        {
+            if (newTexture == null)
+            {
+                Debug.LogWarning($"Texture at index {selectedIndex} is null, using a black texture.");
+                newTexture = new Texture2D(1, 1, _textureFormat, false);
+                newTexture.SetPixel(0, 0, Color.black);
+                newTexture.Apply();
+            }
+            UpdateTextureInArray(newTexture, selectedIndex, normalMapPath);
+        }
+        public void UpdateMaskInArray(Texture2D newTexture)
+        {
+            if (newTexture == null)
+            {
+                Debug.LogWarning($"Texture at index {selectedIndex} is null, using a black texture.");
+                newTexture = new Texture2D(1, 1, _textureFormat, false);
+                newTexture.SetPixel(0, 0, Color.white);
+                newTexture.Apply();
+            }
+            UpdateTextureInArray(newTexture, selectedIndex, maskMapPath);
+        }
+        private static void UpdateTextureInArray(Texture2D newTexture, int index, string textureArrayPath)
+        {
+            // **加载已有的 Texture2DArray**
+            Texture2DArray textureArray = AssetDatabase.LoadAssetAtPath<Texture2DArray>(textureArrayPath);
+            if (textureArray == null)
+            {
+                Debug.LogError("未找到 Texture2DArray 资源: " + textureArrayPath);
+                return;
+            }
+
+            if (index < 0 || index >= textureArray.depth)
+            {
+                Debug.LogError("索引超出范围: " + index);
+                return;
+            }
+
+            int width = textureArray.width;
+            int height = textureArray.height;
+            TextureFormat format = TextureFormat.RGBA32;
+
+            // **拷贝新纹理到 `Texture2DArray` 的指定层**
+
+            // 手动解压 贴图 到 RGBA32
+            Texture2D tempTexture = new Texture2D(width, height, format, false);
+            // Debug.LogError($"Texture {i} has a different size! Rescale required.");
+            RenderTexture rt = RenderTexture.GetTemporary(width, height, 0);
+            
+            Graphics.Blit(newTexture, rt);
+            RenderTexture.active = rt;
+            tempTexture.ReadPixels(new Rect(0, 0, width, height), 0, 0);
+            tempTexture.Apply();
+            RenderTexture.active = null;
+            RenderTexture.ReleaseTemporary(rt);
+
+            // 拷贝到Texture2DArray
+            Graphics.CopyTexture(tempTexture, 0, 0, textureArray, index, 0);
+
+            // **标记资源已更改**
+            EditorUtility.SetDirty(textureArray);
+            AssetDatabase.SaveAssets();
+            Debug.Log($"更新 {index} 层的贴图成功！");
+        }
+        #endregion
 
         /// <summary>
         /// 异步保存，解决卡顿的问题不佳

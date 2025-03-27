@@ -2,8 +2,8 @@ Shader "KIIF/Terrain"
 {
     Properties
     {
-        [MainColor] _BaseColor("Color", Color) = (1,1,1,1)
-        [MainTexture] _BaseMap("Albedo", 2DArray) = "white" {}
+//        [MainColor] _BaseColor("Color", Color) = (1,1,1,1)
+        [MainTexture][NoScaleOffset] _BaseMap("Albedo", 2DArray) = "white" {}
         _LayerCount("Texture Array Layers", Int) = 4
 
         _UVScale01("UVScale01", Float) = 1
@@ -23,15 +23,15 @@ Shader "KIIF/Terrain"
         _UVScale15("UVScale15", Float) = 1
         _UVScale16("UVScale16", Float) = 1
 
-        [Toggle(_DoubleSide)] _DoubleSide("双面", Float) = 0.0
-        [Toggle(_ALPHATEST_ON)] _AlphaTest("Alpha Clipping", Float) = 0.0
-        _Cutoff("剔除阈值", Range(0.0, 1.0)) = 0.5
-        _BumpScale("法线强度", Float) = 1.0
+//        [Toggle(_DoubleSide)] _DoubleSide("双面", Float) = 0.0
+//        [Toggle(_ALPHATEST_ON)] _AlphaTest("Alpha Clipping", Float) = 0.0
+//        _Cutoff("剔除阈值", Range(0.0, 1.0)) = 0.5
+//        _BumpScale("法线强度", Float) = 1.0
         [NoScaleOffset] _BumpMap("Normal Map", 2DArray) = "bump" {}
-        [NoScaleOffset] _SMAEMap("R:光滑度 G:金属度 B:AO A:自发光", 2D) = "white" {}
-        _Smoothness("光滑度", Range(0.0, 1.0)) = 0.5
-        [Gamma] _Metallic("金属度", Range(0.0, 1.0)) = 0.0
-        _OcclusionStrength("AO", Range(0.0, 1.0)) = 1.0
+        [NoScaleOffset] _SMAEMap("R:光滑度 G:金属度", 2DArray) = "white" {}
+//        _Smoothness("光滑度", Range(0.0, 1.0)) = 0.5
+//        [Gamma] _Metallic("金属度", Range(0.0, 1.0)) = 0.0
+//        _OcclusionStrength("AO", Range(0.0, 1.0)) = 1.0
         
         _HeightTransition("HeightTransition", Range(0, 1.0)) = 0.0
 
@@ -123,7 +123,7 @@ Shader "KIIF/Terrain"
 
             CBUFFER_START(UnityPerMaterial)
             float4 _BaseMap_ST;
-            half4 _BaseColor;
+            // half4 _BaseColor;
 
             uint _LayerCount;
             float _UVScale01;
@@ -143,17 +143,18 @@ Shader "KIIF/Terrain"
             float _UVScale15;
             float _UVScale16;
 
-            half _Cutoff;
+            // half _Cutoff;
             half _BumpScale;
-            half _Smoothness;
-            half _Metallic;
-            half _OcclusionStrength;
+            // half _Smoothness;
+            // half _Metallic;
+            // half _OcclusionStrength;
             
             half _HeightTransition;
             CBUFFER_END
 
             TEXTURE2D_ARRAY(_BaseMap);         SAMPLER(sampler_BaseMap);
             TEXTURE2D_ARRAY(_BumpMap);         SAMPLER(sampler_BumpMap);
+            TEXTURE2D_ARRAY(_SMAEMap);         SAMPLER(sampler_SMAEMap);
             TEXTURE2D_ARRAY(_ControlMap);      SAMPLER(sampler_ControlMap);
 
             Varyings vert(Attributes input)
@@ -276,7 +277,8 @@ Shader "KIIF/Terrain"
 
                 #if defined(_NORMALMAP)
                 // 采样法线贴图（Texture2DArray）
-                result.normal = SAMPLE_TEXTURE2D_ARRAY(_BumpMap, sampler_BumpMap, uv, layerIndex).rgb * 2 - 1;
+                result.normal = SAMPLE_TEXTURE2D_ARRAY(_BumpMap, sampler_BumpMap, uv, layerIndex).bgr * 2 - 1;
+                result.normal *= half3(-1,1,1) ;
                 #endif
 
                 return result;
@@ -343,7 +345,7 @@ Shader "KIIF/Terrain"
                 // -------------------------------------
                 //采样 初始化
                 float4 mapColor = 0;
-                float3 mapNormal = input.normalWS;
+                float3 mapNormal = 0;
                 float2 baseUV = TRANSFORM_TEX(input.uv, _BaseMap);
                 
                 float maxHeight = 0;
@@ -409,8 +411,22 @@ Shader "KIIF/Terrain"
                     mapNormal += terrainLayer[layerIndex].normal * w;
                     #endif
                 }
+
+                // 如果因为一些原因导致权重为0，则用第0层作为Base层渲染
+                if(paintedLayerIndex == 0)
+                {
+                    LayerSample layer = SampleLayer(baseUV, 0);
+                    mapColor = layer.albedo;
+                    #if defined(_NORMALMAP)
+                    mapNormal += layer.normal;
+                    #endif
+                }
+                
                 mapColor.a = 1;
                 // return mapColor;
+                // #if defined(_NORMALMAP)
+                // return half4(mapNormal,1);
+                // #endif
 
                 #ifdef _BAKEMODE
                 return mapColor;
@@ -420,6 +436,9 @@ Shader "KIIF/Terrain"
                 // 法线转换到世界空间
                 half3x3 tangentToWorld = half3x3(input.tangentWS.xyz, input.bitangentWS.xyz, input.normalWS.xyz);
                 mapNormal = TransformTangentToWorld(mapNormal, tangentToWorld);
+                // return half4(mapNormal,1);
+                #else
+                mapNormal = input.normalWS;
                 #endif
 
                 // -------------------------------------
@@ -628,5 +647,5 @@ Shader "KIIF/Terrain"
             ENDHLSL
         }
     }
-    CustomEditor "PBR_Base_ShaderGUI"
+//    CustomEditor "PBR_Base_ShaderGUI"
 }

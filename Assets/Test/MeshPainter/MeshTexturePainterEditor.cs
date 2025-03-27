@@ -13,10 +13,9 @@ namespace Tomokin
         private MeshTexturePainter painter;
         private MonoScript monoScript;
         private GUIContent editIcon;
-        private bool isCreatTexture = false;            // 是否正在选择新纹理
+        // private bool isCreatTexture = false;            // 是否正在选择新纹理
         // private bool isReplaceTexture = false;          // 是否正在选择新纹理
         private bool isTextureChangede = false;         // 是否修改了地形纹理
-        private Texture2D[] terrainPreview;
         private static readonly int[] TextureSizes = { 128, 256, 512, 1024, 2048, 4096 };
 
         private Texture2D[] terrainBrushes;
@@ -109,7 +108,7 @@ namespace Tomokin
                         // 卸载RT
                         painter.ClearRT();
                         // 保存现在的权重图
-                        painter.SaveTextureArray();
+                        // painter.SaveWeightTextureArray();
                     }
                 }
                 // painter.isDebugMode = GUILayout.Toggle(painter.isDebugMode, "Debug", "Button",
@@ -131,6 +130,7 @@ namespace Tomokin
 
                 // ================ 地形纹理管理 ================
                 EditorGUILayout.LabelField("地形纹理", EditorStyles.boldLabel);
+                Texture2D[] terrainPreview = painter.terrainPreview;
 
                 int textureCount = painter.terrainTextures.Count;
                 int sIndex = painter.selectedIndex;
@@ -141,8 +141,13 @@ namespace Tomokin
 
                 if (GUILayout.Button("添加新纹理", GUILayout.Width(100)))
                 {
-                    EditorGUIUtility.ShowObjectPicker<Texture2D>(null, false, "", 0);
-                    isCreatTexture = true;
+                    // EditorGUIUtility.ShowObjectPicker<Texture2D>(null, false, "", 0);
+                    Undo.RecordObject(painter, "Create Texture");
+                    painter.AddTerrainTexture();
+                    painter.SaveTerrainTexturesToTexture2DArray();      // 添加新层后保存一遍
+                    painter.UpdateWeightMaps();                         // 添加新层后刷新权重图
+                    EditorUtility.SetDirty(painter);
+                    isTextureChangede = true;
                 }
 
                 // GUI.enabled = painter.terrainTextures.Count > 0;
@@ -158,6 +163,8 @@ namespace Tomokin
                     {
                         Undo.RecordObject(painter, "Remove Texture");
                         painter.terrainTextures.RemoveAt(sIndex);
+                        painter.SaveTerrainTexturesToTexture2DArray();      // 添加新层后保存一遍
+                        painter.UpdateWeightMaps();                         // 添加新层后刷新权重图
 
                         // 确保索引不会越界
                         sIndex = Mathf.Clamp(sIndex, 0, painter.terrainTextures.Count - 1);
@@ -174,7 +181,7 @@ namespace Tomokin
                 {
                     // Texture2D[] textureArray = painter.terrainTextures.ToArray();
                     int newTextureIndex = GUILayout.SelectionGrid(sIndex, terrainPreview, painter.controlChannels,
-                        "gridlist", GUILayout.Width(360), GUILayout.Height(gridHeight));
+                        GUILayout.Width(360), GUILayout.Height(gridHeight));
 
                     // **点击选中纹理**
                     if (newTextureIndex != sIndex)
@@ -184,52 +191,82 @@ namespace Tomokin
                         painter.SelectTexture(newTextureIndex);
                         sIndex = newTextureIndex;
                         EditorUtility.SetDirty(painter);
+                        GUI.FocusControl(null); // 取消输入框焦点
                     }
 
                     // **纹理信息**
                     if (painter.terrainTextures.Count > 0)
                     {
                         EditorGUILayout.BeginVertical("box");
-                        // 开始监视所有贴图槽的更改
-                        EditorGUI.BeginChangeCheck();
+                        // EditorGUI.BeginChangeCheck();
 
+                        EditorGUI.BeginChangeCheck();
+                        painter.terrainTextures[sIndex].tilling = EditorGUILayout.FloatField("Tiling",
+                            painter.terrainTextures[sIndex].tilling);
+                        if (EditorGUI.EndChangeCheck())
+                        {
+                            painter.UpdateTiling(sIndex);
+                        }
+                        // 检测鼠标点击时，认为是停止输入
+                        if (Event.current.type == EventType.MouseDown)
+                        {
+                            GUI.FocusControl(null); // 取消输入框焦点
+                        }
+
+                        // ** 颜色纹理 **
                         EditorGUILayout.BeginHorizontal();
                         EditorGUILayout.LabelField("Albedo Map", GUILayout.Width(100));
                         GUILayout.FlexibleSpace(); // 添加弹性间距，让右侧贴图槽靠近 Inspector 右侧
+                        EditorGUI.BeginChangeCheck();
                         Texture2D albedo = (Texture2D)EditorGUILayout.ObjectField(
                             painter.terrainTextures[sIndex].albedoMap, typeof(Texture2D), false,
                             GUILayout.Width(72), GUILayout.Height(72));
-                        painter.terrainTextures[sIndex].albedoMap = albedo;
+                        if (EditorGUI.EndChangeCheck())
+                        {
+                            Undo.RecordObject(painter, "Modify Albedo Map");
+                            painter.terrainTextures[sIndex].albedoMap = albedo;
+                            painter.UpdateAlbedoInArray(albedo);
+                            terrainPreview = painter.ConvertToPreviewTexture();     // 颜色纹理修改时，更新预览图
+                            EditorUtility.SetDirty(painter);
+                            Debug.Log("Albedo Map 修改了！");
+                        }
                         EditorGUILayout.EndHorizontal();
-
+                        
+                        // ** 法线纹理 **
                         EditorGUILayout.BeginHorizontal();
                         EditorGUILayout.LabelField("Normal Map", GUILayout.Width(100));
                         GUILayout.FlexibleSpace(); // 添加弹性间距，让右侧贴图槽靠近 Inspector 右侧
+                        EditorGUI.BeginChangeCheck();
                         Texture2D normal = (Texture2D)EditorGUILayout.ObjectField(
                             painter.terrainTextures[sIndex].normalMap, typeof(Texture2D), false,
                             GUILayout.Width(72), GUILayout.Height(72));
-                        painter.terrainTextures[sIndex].normalMap = normal;
+                        if (EditorGUI.EndChangeCheck())
+                        {
+                            Undo.RecordObject(painter, "Modify Normal Map");
+                            painter.terrainTextures[sIndex].normalMap = normal;
+                            painter.UpdateNormalInArray(normal);
+                            EditorUtility.SetDirty(painter);
+                            Debug.Log("Normal  Map 修改了！");
+                        }
                         EditorGUILayout.EndHorizontal();
 
+                        // ** 光滑金属度纹理 **
                         EditorGUILayout.BeginHorizontal();
-                        EditorGUILayout.LabelField("Mask Map", GUILayout.Width(100));
+                        EditorGUILayout.LabelField("Smoothness&Metalic Map", GUILayout.Width(100));
                         GUILayout.FlexibleSpace(); // 添加弹性间距，让右侧贴图槽靠近 Inspector 右侧
+                        EditorGUI.BeginChangeCheck();
                         Texture2D mask = (Texture2D)EditorGUILayout.ObjectField(
                             painter.terrainTextures[sIndex].maskMap, typeof(Texture2D), false,
                             GUILayout.Width(72), GUILayout.Height(72));
-                        painter.terrainTextures[sIndex].maskMap = mask;
-                        EditorGUILayout.EndHorizontal();
-
                         if (EditorGUI.EndChangeCheck())
                         {
-                            Undo.RecordObject(painter, "Modify Terrain Texture");
-                            painter.terrainTextures[sIndex].albedoMap = albedo;
-                            painter.terrainTextures[sIndex].normalMap = normal;
+                            Undo.RecordObject(painter, "Modify SM Map");
                             painter.terrainTextures[sIndex].maskMap = mask;
-                            terrainPreview = painter.ConvertToPreviewTexture();
-                            EditorUtility.SetDirty(painter); // 标记 Painter 需要保存
-                            Debug.Log("贴图修改了！");
+                            painter.UpdateMaskInArray(mask);
+                            EditorUtility.SetDirty(painter);
+                            Debug.Log("SM  Map 修改了！");
                         }
+                        EditorGUILayout.EndHorizontal();
 
                         EditorGUILayout.EndVertical();
                     }
@@ -243,20 +280,20 @@ namespace Tomokin
                 EditorGUILayout.Space();
 
                 // **检测 Object Picker 选择结果**
-                if (isCreatTexture && Event.current.commandName == "ObjectSelectorUpdated")
-                {
-                    Texture2D selectedTexture = (Texture2D)EditorGUIUtility.GetObjectPickerObject();
-                    if (selectedTexture != null)
-                    {
-                        Undo.RecordObject(painter, "Create Texture");
-                        // painter.terrainTextures.Add(selectedTexture);
-                        painter.AddTerrainTexture(selectedTexture);
-                        painter.selectedIndex = sIndex + 1;
-                        EditorUtility.SetDirty(painter);
-                    }
-                    isCreatTexture = false;
-                    isTextureChangede = true;
-                }
+                // if (isCreatTexture && Event.current.commandName == "ObjectSelectorUpdated")
+                // {
+                //     Texture2D selectedTexture = (Texture2D)EditorGUIUtility.GetObjectPickerObject();
+                //     if (selectedTexture != null)
+                //     {
+                //         Undo.RecordObject(painter, "Create Texture");
+                //         // painter.terrainTextures.Add(selectedTexture);
+                //         painter.AddTerrainTexture(selectedTexture);
+                //         painter.selectedIndex = sIndex + 1;
+                //         EditorUtility.SetDirty(painter);
+                //     }
+                //     isCreatTexture = false;
+                //     isTextureChangede = true;
+                // }
 
                 // if (isReplaceTexture && Event.current.commandName == "ObjectSelectorUpdated")
                 // {
@@ -352,6 +389,43 @@ namespace Tomokin
                 }
             }
             serializedObject.ApplyModifiedProperties();
+        }
+    }
+    
+    // 在纹理修改时，重新导入触发保存
+    public class TextureReimportChecker : AssetPostprocessor
+    {
+        static private bool isTextureImport = false;
+        void OnPostprocessTexture(Texture2D texture)
+        {
+            if (texture == null)
+                return;
+
+            Debug.Log($"has texture imported :{assetPath}");
+            isTextureImport = true;
+        }
+
+        private static void OnPostprocessAllAssets(string[] importedAssets, string[] deletedAssets, string[] movedAssets,
+            string[] movedFromAssetPaths)
+        {
+            if (isTextureImport)
+            {
+                // 查找当前场景所有的 MeshTexturePainter
+                MeshTexturePainter[] allPainters = GameObject.FindObjectsOfType<MeshTexturePainter>();
+                if (allPainters.Length == 0)
+                    return;
+
+                // Debug.Log($"Texture {assetPath} reimported, updating terrain textures...");
+
+                // 遍历所有 Painter，调用保存方法
+                foreach (var painter in allPainters)
+                {
+                    painter.SaveTerrainTexturesToTexture2DArray();
+                    painter.ConvertToPreviewTexture();
+                }
+
+                isTextureImport = false;
+            }
         }
     }
 }
