@@ -38,9 +38,15 @@ namespace Tomokin
 
         public void AddTerrainTexture()
         {
-            // terrainTextures.Add(new TerrainTexture());
-            terrainTextures.Insert(selectedIndex + 1, new TerrainTexture());
-            selectedIndex++;
+            if (terrainTextures.Count == 0)
+            {
+                terrainTextures.Add(new TerrainTexture());
+            }
+            else
+            {
+                terrainTextures.Insert(selectedIndex + 1, new TerrainTexture());
+                selectedIndex++;
+            }
         }
 
         public void AddTerrainTexture(Texture2D albedoMap)
