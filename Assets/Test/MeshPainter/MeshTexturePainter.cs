@@ -145,13 +145,13 @@ namespace Tomokin
         // 会随着材质球的路径变化而变化
         private string CONTROL_MAP_PATH = "Assets/ControlMaps/";
 
-        private string controlMapName => gameObject.name + "_Control";
+        private string controlMapName => "T_" + gameObject.name + "_Control";
         private string controlMapPath => CONTROL_MAP_PATH + controlMapName + ".asset";
-        private string albedoMapName => gameObject.name + "_D";     // Albedo
+        private string albedoMapName => "T_" + gameObject.name + "_D";     // Albedo
         private string albedoMapPath => CONTROL_MAP_PATH + albedoMapName + ".asset";
-        private string normalMapName => gameObject.name + "_N";     // Normal
+        private string normalMapName => "T_" + gameObject.name + "_N";     // Normal
         private string normalMapPath => CONTROL_MAP_PATH + normalMapName + ".asset";
-        private string maskMapName => gameObject.name + "_SM";      // Mask
+        private string maskMapName => "T_" + gameObject.name + "_SM";      // Mask
         private string maskMapPath => CONTROL_MAP_PATH + maskMapName + ".asset";
 
         private ComputeShader brushComputeShader;
