@@ -22,7 +22,6 @@ Shader "KIIF/Terrain"
         _UVScale14("UVScale14", Float) = 1
         _UVScale15("UVScale15", Float) = 1
         _UVScale16("UVScale16", Float) = 1
-        _Height1("Height1", Float) = 1
 
 //        [Toggle(_DoubleSide)] _DoubleSide("双面", Float) = 0.0
 //        [Toggle(_ALPHATEST_ON)] _AlphaTest("Alpha Clipping", Float) = 0.0
@@ -144,7 +143,6 @@ Shader "KIIF/Terrain"
             float _UVScale14;
             float _UVScale15;
             float _UVScale16;
-            float _Height1;
 
             // half _Cutoff;
             half _BumpScale;
@@ -400,11 +398,6 @@ Shader "KIIF/Terrain"
                     {
                         // 调用采样函数
                         LayerSample layer = SampleLayer(baseUV, layerIndex);
-
-                        if(layerIndex == 0)
-                        {
-                            layer.albedo.a *= _Height1;
-                        }
 
                         // 高度计算(重新映射高度，使得高度差更容易绘制出)
                         // half power = max(_HeightPower, 1e-5);
