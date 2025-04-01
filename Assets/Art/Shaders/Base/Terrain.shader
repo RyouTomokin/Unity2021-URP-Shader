@@ -22,20 +22,22 @@ Shader "KIIF/Terrain"
         _UVScale14("UVScale14", Float) = 1
         _UVScale15("UVScale15", Float) = 1
         _UVScale16("UVScale16", Float) = 1
+        _Height1("Height1", Float) = 1
 
 //        [Toggle(_DoubleSide)] _DoubleSide("双面", Float) = 0.0
 //        [Toggle(_ALPHATEST_ON)] _AlphaTest("Alpha Clipping", Float) = 0.0
 //        _Cutoff("剔除阈值", Range(0.0, 1.0)) = 0.5
 //        _BumpScale("法线强度", Float) = 1.0
-        [NoScaleOffset] _BumpMap("Normal Map", 2DArray) = "bump" {}
-        [NoScaleOffset] _SMAEMap("R:光滑度 G:金属度", 2DArray) = "white" {}
+        [NoScaleOffset] _BumpMap("Normal Map", 2DArray) = "" {}
+        [NoScaleOffset] _SMAEMap("R:光滑度 G:金属度", 2DArray) = "" {}
 //        _Smoothness("光滑度", Range(0.0, 1.0)) = 0.5
 //        [Gamma] _Metallic("金属度", Range(0.0, 1.0)) = 0.0
 //        _OcclusionStrength("AO", Range(0.0, 1.0)) = 1.0
         
-        _HeightTransition("HeightTransition", Range(0, 1.0)) = 0.0
+//        _HeightTransition("HeightTransition", Range(0, 1.0)) = 0.5
+//        _HeightPower("HeightPower", Range(0, 10)) = 1
 
-        [NoScaleOffset] _ControlMap("ControlMap", 2DArray) = "white" {}
+        [NoScaleOffset] _ControlMap("ControlMap", 2DArray) = "" {}
     }
     SubShader
     {
@@ -58,7 +60,7 @@ Shader "KIIF/Terrain"
             // Material Keywords
             #pragma shader_feature_local_fragment  _ALPHATEST_ON
             #pragma shader_feature_local _NORMALMAP
-            #pragma shader_feature_local_fragment  _SMAEMAP
+            // #pragma shader_feature_local_fragment  _SMAEMAP
             #pragma shader_feature_local_fragment  _BAKEMODE
 
             // -------------------------------------
@@ -142,6 +144,7 @@ Shader "KIIF/Terrain"
             float _UVScale14;
             float _UVScale15;
             float _UVScale16;
+            float _Height1;
 
             // half _Cutoff;
             half _BumpScale;
@@ -149,7 +152,8 @@ Shader "KIIF/Terrain"
             // half _Metallic;
             // half _OcclusionStrength;
             
-            half _HeightTransition;
+            // half _HeightTransition;
+            // half _HeightPower;
             CBUFFER_END
 
             TEXTURE2D_ARRAY(_BaseMap);         SAMPLER(sampler_BaseMap);
@@ -265,6 +269,7 @@ Shader "KIIF/Terrain"
             {
                 float4 albedo;  // 颜色贴图采样结果
                 float3 normal;  // 法线贴图采样结果
+                float3 sm;      // 法线贴图采样结果
             };
 
             LayerSample SampleLayer(float2 uv, uint layerIndex)
@@ -277,10 +282,14 @@ Shader "KIIF/Terrain"
 
                 #if defined(_NORMALMAP)
                 // 采样法线贴图（Texture2DArray）
-                result.normal = SAMPLE_TEXTURE2D_ARRAY(_BumpMap, sampler_BumpMap, uv, layerIndex).bgr * 2 - 1;
-                result.normal *= half3(-1,1,1) ;
+                // DXT5nm R->1 G->G B->G A->R
+                result.normal = UnpackNormalAG(SAMPLE_TEXTURE2D_ARRAY(_BumpMap, sampler_BumpMap, uv, layerIndex));
                 #endif
 
+                // #if defined(_SMAEMAP)
+                result.sm = SAMPLE_TEXTURE2D_ARRAY(_SMAEMap, sampler_SMAEMap, uv, layerIndex);
+                // #endif
+                
                 return result;
             }
 
@@ -292,7 +301,8 @@ Shader "KIIF/Terrain"
                 half maxHeight = max(splatHeight.r, max(splatHeight.g, max(splatHeight.b, splatHeight.a)));
 
                 // Ensure that the transition height is not zero.
-                half transition = max(_HeightTransition, 1e-5);
+                // half transition = max(_HeightTransition, 1e-5);
+                half transition = 0.5;
 
                 // This sets the highest splat to "transition", and everything else to a lower value relative to that, clamping to zero
                 // Then we clamp this to zero and normalize everything
@@ -346,6 +356,7 @@ Shader "KIIF/Terrain"
                 //采样 初始化
                 float4 mapColor = 0;
                 float3 mapNormal = 0;
+                float3 mapSM = 0;
                 float2 baseUV = TRANSFORM_TEX(input.uv, _BaseMap);
                 
                 float maxHeight = 0;
@@ -358,7 +369,7 @@ Shader "KIIF/Terrain"
                     blendHeight[i] = 0;
                 }
 
-                // 采样地形的颜色纹理（法线、金属粗糙）
+                // 采样地形的颜色纹理（法线、金属粗糙）  并计算权重高度
                 for (uint layerIndex = 0; layerIndex < _LayerCount; layerIndex ++)
                 {
                     uint controlLayer = ceil(layerIndex / 4);
@@ -370,7 +381,15 @@ Shader "KIIF/Terrain"
                         // 调用采样函数
                         LayerSample layer = SampleLayer(baseUV, layerIndex);
 
-                        // 高度计算
+                        if(layerIndex == 0)
+                        {
+                            layer.albedo.a *= _Height1;
+                        }
+
+                        // 高度计算(重新映射高度，使得高度差更容易绘制出)
+                        // half power = max(_HeightPower, 1e-5);
+                        half power = 1;
+                        weight = pow(weight, max(1 - pow(layer.albedo.a, power), 0.4));
                         float tempHeight = weight * layer.albedo.a;
                         maxHeight = max(maxHeight, tempHeight);         // 高度权重的最大值
                         blendHeight[paintedLayerIndex] = tempHeight;    // 高度权重
@@ -393,10 +412,13 @@ Shader "KIIF/Terrain"
                 
                 // 把有权重的地形，重新计算权重值
                 float sumHeight = 0;
-                _HeightTransition = max(_HeightTransition, 1e-5);
+                // half transition = max(_HeightTransition, 1e-5);
+                const half transition = 0.5;
+                
                 for(uint layerIndex = 0; layerIndex < paintedLayerIndex; layerIndex++)
                 {
-                    blendHeight[layerIndex] = max(blendHeight[layerIndex] - maxHeight + _HeightTransition, 0) * blendWeight[layerIndex];
+                    blendHeight[layerIndex] = max(blendHeight[layerIndex] - maxHeight + transition, 0)
+                        * blendWeight[layerIndex];
                     sumHeight += blendHeight[layerIndex];
                 }
 
@@ -410,6 +432,7 @@ Shader "KIIF/Terrain"
                     // 法线混合（简单加权，可能需要规范化）
                     mapNormal += terrainLayer[layerIndex].normal * w;
                     #endif
+                    mapSM = terrainLayer[layerIndex].sm;
                 }
 
                 // 如果因为一些原因导致权重为0，则用第0层作为Base层渲染
@@ -418,8 +441,9 @@ Shader "KIIF/Terrain"
                     LayerSample layer = SampleLayer(baseUV, 0);
                     mapColor = layer.albedo;
                     #if defined(_NORMALMAP)
-                    mapNormal += layer.normal;
+                    mapNormal = layer.normal;
                     #endif
+                    mapSM = layer.sm;
                 }
                 
                 mapColor.a = 1;
@@ -432,6 +456,8 @@ Shader "KIIF/Terrain"
                 return mapColor;
                 #endif
 
+                
+
                 #if defined(_NORMALMAP)
                 // 法线转换到世界空间
                 half3x3 tangentToWorld = half3x3(input.tangentWS.xyz, input.bitangentWS.xyz, input.normalWS.xyz);
@@ -441,10 +467,12 @@ Shader "KIIF/Terrain"
                 mapNormal = input.normalWS;
                 #endif
 
+                
+
                 // -------------------------------------
                 //PBR光照
                 BRDFData brdfData = (BRDFData)0;
-                InitializeBRDFData(mapColor.rgb, 0, half3(0.0h, 0.0h, 0.0h), 0, mapColor.a, brdfData);
+                InitializeBRDFData(mapColor.rgb, mapSM.g, half3(0.0h, 0.0h, 0.0h), mapSM.r, mapColor.a, brdfData);
 
                 float4 shadowCoord = TransformWorldToShadowCoord(input.positionWS);     //主光计算阴影
                 Light mainLight = GetMainLight(shadowCoord);
@@ -633,7 +661,7 @@ Shader "KIIF/Terrain"
 
             #pragma shader_feature _SPECULAR_SETUP
             #pragma shader_feature _EMISSION
-            #pragma shader_feature _SMAEMAP
+            // #pragma shader_feature _SMAEMAP
             #pragma shader_feature _METALLICSPECGLOSSMAP
             #pragma shader_feature _ALPHATEST_ON
             #pragma shader_feature _ _SMOOTHNESS_TEXTURE_ALBEDO_CHANNEL_A

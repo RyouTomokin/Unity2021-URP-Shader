@@ -81,7 +81,8 @@ namespace Tomokin
                 : value;
         }
 
-        public float brushSize = 0.1f;
+        public float brushSize = 1.0f;
+        private const float brushSizeDelta = 0.2f;
         private float brushScale = 1.0f;
         public float brushStrength = 0.5f;
 
@@ -89,6 +90,7 @@ namespace Tomokin
         [HideInInspector] public bool isSavedWeight = false;
         private double lastRepaintTime = 0; // 上次刷新的时间
         private const double repaintInterval = 0.03; // 限制 30ms 刷新一次（大约 33FPS）
+        private bool _onMouseDone;
 
         private Material _material;
 
@@ -182,6 +184,10 @@ namespace Tomokin
             DestroyImmediate(backupWeightMapArray);
             DestroyImmediate(paintRT);
             DestroyImmediate(weightMapArrayRT);
+
+            isPainting = false;
+            Tools.hidden = false;
+            // SaveWeightTextureArray();
         }
 
         private void InitializeComputeShader()
@@ -287,7 +293,11 @@ namespace Tomokin
         private void InitializeTextures()
         {
             if (terrainTextures.Count == 0 || GetComponent<MeshRenderer>() == null) return;
-            
+
+            if (_material == null)
+            {
+                _material = GetComponent<MeshRenderer>()?.sharedMaterial;
+            }
             // 获取材质完整路径
             string fullPath = AssetDatabase.GetAssetPath(_material);
             // 仅获取所在文件夹路径
@@ -483,6 +493,11 @@ namespace Tomokin
             // 获取鼠标射线
             Ray ray = HandleUtility.GUIPointToWorldRay(e.mousePosition);
             RaycastHit hit;
+            
+            if (e.alt)
+            {
+                return;
+            }
 
             if (Physics.Raycast(ray, out hit))
             {
@@ -492,9 +507,15 @@ namespace Tomokin
                     HandleUtility.AddDefaultControl(0);
                     // 绘制笔刷预览
                     Handles.color = new Color(0.5f, 0.5f, 1.0f, 0.2f);
-                    Handles.DrawSolidDisc(hit.point, hit.normal, brushSize);
-                    // Handles.CircleHandleCap(0, hit.point, Quaternion.LookRotation(hit.normal),
-                    //     brushSize, EventType.Repaint);
+                    if (_onMouseDone)
+                    {
+                        Handles.CircleHandleCap(0, hit.point, Quaternion.LookRotation(hit.normal),
+                            brushSize, EventType.Repaint);
+                    }
+                    else
+                    {
+                        Handles.DrawSolidDisc(hit.point, hit.normal, brushSize);
+                    }
                     Handles.color = new Color(0.6f, 0.6f, 0.9f, 1f);
                     Handles.DrawLine(hit.point, hit.point + hit.normal * brushSize);
 
@@ -502,6 +523,19 @@ namespace Tomokin
                     if (e.control && e.type == EventType.ScrollWheel)
                     {
                         brushSize += e.delta.y * -0.01f * brushSize;
+                        brushSize = Mathf.Clamp(brushSize, 0.01f, 10f); // 限制大小范围
+                        e.Use();
+                    }
+
+                    if (e.type == EventType.KeyDown && e.keyCode == KeyCode.LeftBracket)
+                    {
+                        brushSize -= brushSizeDelta;
+                        brushSize = Mathf.Clamp(brushSize, 0.01f, 10f); // 限制大小范围
+                        e.Use();
+                    }
+                    if (e.type == EventType.KeyDown && e.keyCode == KeyCode.RightBracket)
+                    {
+                        brushSize += brushSizeDelta;
                         brushSize = Mathf.Clamp(brushSize, 0.01f, 10f); // 限制大小范围
                         e.Use();
                     }
@@ -523,7 +557,7 @@ namespace Tomokin
                     //
                     //     e.Use(); // 屏蔽默认框选行为
                     // }
-
+                    
                     if (e.type == EventType.MouseDown && e.button == 0)
                     {
                         // 鼠标按下时，初始化
@@ -532,6 +566,7 @@ namespace Tomokin
                         OnMouseDrag(hit.textureCoord);
                         // 刷新Handle
                         HandleUtility.Repaint();
+                        _onMouseDone = true;
                     }
 
                     if (e.type == EventType.MouseDrag && e.button == 0)
@@ -558,6 +593,7 @@ namespace Tomokin
             {
                 // 绘制
                 OnMouseUp();
+                _onMouseDone = false;
                 // TODO Undo笔刷
                 // Undo.RegisterCompleteObjectUndo(weightMaps[weightMapIndex], "Modify Texture");
                 //
@@ -815,7 +851,8 @@ namespace Tomokin
             TextureArrayGenerator.CreateAndSaveTextureArray(albedoTextures, albedoMapPath, _terrainTextureSize);
 
             Texture2D defaultNormal = new Texture2D(1, 1, _textureFormat, false);
-            defaultNormal.SetPixel(0, 0, new Color(0.5f, 0.5f, 1f, 1f)); // 标准法线颜色
+            // defaultNormal.SetPixel(0, 0, new Color(0.5f, 0.5f, 1f, 1f)); // 标准法线颜色
+            defaultNormal.SetPixel(0, 0, new Color(1.0f, 0.5f, 0.5f, 0.5f)); // DXT5nm法线颜色
             defaultNormal.Apply();
             // List<Texture2D> normalTextures = terrainTextures.Select(t => t.normalMap).ToList();
             List<Texture2D> normalTextures =
@@ -823,7 +860,7 @@ namespace Tomokin
             TextureArrayGenerator.CreateAndSaveTextureArray(normalTextures, normalMapPath, _terrainTextureSize);
 
             Texture2D defaultMask = new Texture2D(1, 1, _textureFormat, false);
-            defaultMask.SetPixel(0, 0, new Color(1f, 1f, 1f, 1f)); // 标准法线颜色
+            defaultMask.SetPixel(0, 0, new Color(0f, 0f, 0f, 0f)); // 光滑 0 金属 0
             defaultMask.Apply();
             List<Texture2D> maskTextures =
                 terrainTextures.Select(t => t.maskMap != null ? t.maskMap : defaultMask).ToList();
@@ -902,7 +939,7 @@ namespace Tomokin
             {
                 Debug.LogWarning($"Texture at index {selectedIndex} is null, using a black texture.");
                 newTexture = new Texture2D(1, 1, _textureFormat, false);
-                newTexture.SetPixel(0, 0, Color.white);
+                newTexture.SetPixel(0, 0, Color.black);
                 newTexture.Apply();
             }
             UpdateTextureInArray(newTexture, selectedIndex, maskMapPath);

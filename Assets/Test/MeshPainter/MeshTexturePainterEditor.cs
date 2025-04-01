@@ -31,8 +31,12 @@ namespace Tomokin
 
         public static Texture2D[] LoadBrushes()
         {
+            // 获取当前脚本的路径
+            string scriptGUID = AssetDatabase.FindAssets("MeshTexturePainter t:Script")[0];
+            string scriptPath = AssetDatabase.GUIDToAssetPath(scriptGUID);
+            scriptPath = Path.GetDirectoryName(scriptPath);
             // 获取 Editor 目录下 Brushes 文件夹的路径
-            string[] guids = AssetDatabase.FindAssets("Brushes", new[] { "Assets" });
+            string[] guids = AssetDatabase.FindAssets("Brushes", new[] { scriptPath });
 
             if (guids.Length == 0)
             {
@@ -393,39 +397,39 @@ namespace Tomokin
     }
     
     // 在纹理修改时，重新导入触发保存
-    public class TextureReimportChecker : AssetPostprocessor
-    {
-        static private bool isTextureImport = false;
-        void OnPostprocessTexture(Texture2D texture)
-        {
-            if (texture == null)
-                return;
-
-            Debug.Log($"has texture imported :{assetPath}");
-            isTextureImport = true;
-        }
-
-        private static void OnPostprocessAllAssets(string[] importedAssets, string[] deletedAssets, string[] movedAssets,
-            string[] movedFromAssetPaths)
-        {
-            if (isTextureImport)
-            {
-                // 查找当前场景所有的 MeshTexturePainter
-                MeshTexturePainter[] allPainters = GameObject.FindObjectsOfType<MeshTexturePainter>();
-                if (allPainters.Length == 0)
-                    return;
-
-                // Debug.Log($"Texture {assetPath} reimported, updating terrain textures...");
-
-                // 遍历所有 Painter，调用保存方法
-                foreach (var painter in allPainters)
-                {
-                    painter.SaveTerrainTexturesToTexture2DArray();
-                    painter.ConvertToPreviewTexture();
-                }
-
-                isTextureImport = false;
-            }
-        }
-    }
+    // public class TextureReimportChecker : AssetPostprocessor
+    // {
+    //     static private bool isTextureImport = false;
+    //     void OnPostprocessTexture(Texture2D texture)
+    //     {
+    //         if (texture == null)
+    //             return;
+    //
+    //         Debug.Log($"has texture imported :{assetPath}");
+    //         isTextureImport = true;
+    //     }
+    //
+    //     private static void OnPostprocessAllAssets(string[] importedAssets, string[] deletedAssets, string[] movedAssets,
+    //         string[] movedFromAssetPaths)
+    //     {
+    //         if (isTextureImport)
+    //         {
+    //             // 查找当前场景所有的 MeshTexturePainter
+    //             MeshTexturePainter[] allPainters = GameObject.FindObjectsOfType<MeshTexturePainter>();
+    //             if (allPainters.Length == 0)
+    //                 return;
+    //
+    //             // Debug.Log($"Texture {assetPath} reimported, updating terrain textures...");
+    //
+    //             // 遍历所有 Painter，调用保存方法
+    //             foreach (var painter in allPainters)
+    //             {
+    //                 painter.SaveTerrainTexturesToTexture2DArray();
+    //                 painter.ConvertToPreviewTexture();
+    //             }
+    //
+    //             isTextureImport = false;
+    //         }
+    //     }
+    // }
 }
