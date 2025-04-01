@@ -33,7 +33,7 @@ Shader "KIIF/Terrain"
 //        _Smoothness("光滑度", Range(0.0, 1.0)) = 0.5
 //        [Gamma] _Metallic("金属度", Range(0.0, 1.0)) = 0.0
 //        _OcclusionStrength("AO", Range(0.0, 1.0)) = 1.0
-        
+
 //        _HeightTransition("HeightTransition", Range(0, 1.0)) = 0.5
 //        _HeightPower("HeightPower", Range(0, 10)) = 1
 
@@ -151,7 +151,7 @@ Shader "KIIF/Terrain"
             // half _Smoothness;
             // half _Metallic;
             // half _OcclusionStrength;
-            
+
             // half _HeightTransition;
             // half _HeightPower;
             CBUFFER_END
@@ -274,7 +274,7 @@ Shader "KIIF/Terrain"
 
             LayerSample SampleLayer(float2 uv, uint layerIndex)
             {
-                LayerSample result;
+                LayerSample result = (LayerSample)0;
 
                 uv *= GetUVScale(layerIndex);
                 // 采样颜色贴图（Texture2DArray）
@@ -289,8 +289,28 @@ Shader "KIIF/Terrain"
                 // #if defined(_SMAEMAP)
                 result.sm = SAMPLE_TEXTURE2D_ARRAY(_SMAEMap, sampler_SMAEMap, uv, layerIndex);
                 // #endif
-                
+
                 return result;
+            }
+
+            inline half3 GetAdditionalLightColor(BRDFData brdfData, float3 positionWS, float3 normalWS, float3 viewDirectionWS)
+            {
+                half3 additionColor = half3(0,0,0);
+                uint pixelLightCount = GetAdditionalLightsCount();
+                for (uint i = 0u; i < pixelLightCount; ++i)
+                {
+                    // Light light = GetAdditionalLight(lightIndex, pbrData.positionWS, 1);
+                    #if USE_CLUSTERED_LIGHTING
+                    int lightIndex = i;
+                    #else
+                    int lightIndex = GetPerObjectLightIndex(i);
+                    Light light = GetAdditionalPerObjectLight(lightIndex, positionWS);
+                    #endif
+                    //只获取实时点光源阴影
+                    light.shadowAttenuation = AdditionalLightRealtimeShadow(lightIndex, positionWS, light.direction);
+                    additionColor += LightingPhysicallyBased(brdfData, light, normalWS, viewDirectionWS);
+                }
+                return additionColor;
             }
 
             // 高度混合的基础原理
@@ -358,7 +378,7 @@ Shader "KIIF/Terrain"
                 float3 mapNormal = 0;
                 float3 mapSM = 0;
                 float2 baseUV = TRANSFORM_TEX(input.uv, _BaseMap);
-                
+
                 float maxHeight = 0;
                 float blendHeight[16];
                 float blendWeight[16];
@@ -393,7 +413,7 @@ Shader "KIIF/Terrain"
                         float tempHeight = weight * layer.albedo.a;
                         maxHeight = max(maxHeight, tempHeight);         // 高度权重的最大值
                         blendHeight[paintedLayerIndex] = tempHeight;    // 高度权重
-                        
+
                         terrainLayer[paintedLayerIndex] = layer;
                         blendWeight[paintedLayerIndex] = weight;
 
@@ -407,14 +427,14 @@ Shader "KIIF/Terrain"
                         // // 法线混合（简单加权，可能需要规范化）
                         // mapNormal += layer.normal * weight;
                         // #endif
-                    }                    
+                    }
                 }
-                
+
                 // 把有权重的地形，重新计算权重值
                 float sumHeight = 0;
                 // half transition = max(_HeightTransition, 1e-5);
                 const half transition = 0.5;
-                
+
                 for(uint layerIndex = 0; layerIndex < paintedLayerIndex; layerIndex++)
                 {
                     blendHeight[layerIndex] = max(blendHeight[layerIndex] - maxHeight + transition, 0)
@@ -445,7 +465,7 @@ Shader "KIIF/Terrain"
                     #endif
                     mapSM = layer.sm;
                 }
-                
+
                 mapColor.a = 1;
                 // return mapColor;
                 // #if defined(_NORMALMAP)
@@ -456,7 +476,7 @@ Shader "KIIF/Terrain"
                 return mapColor;
                 #endif
 
-                
+
 
                 #if defined(_NORMALMAP)
                 // 法线转换到世界空间
@@ -467,10 +487,10 @@ Shader "KIIF/Terrain"
                 mapNormal = input.normalWS;
                 #endif
 
-                
+
 
                 // -------------------------------------
-                //PBR光照
+                // PBR光照
                 BRDFData brdfData = (BRDFData)0;
                 InitializeBRDFData(mapColor.rgb, mapSM.g, half3(0.0h, 0.0h, 0.0h), mapSM.r, mapColor.a, brdfData);
 
@@ -482,6 +502,9 @@ Shader "KIIF/Terrain"
                 half3 GIcolor = GlobalIllumination(brdfData, bakedGI, 1, mapNormal, viewDirection);
 
                 color += GIcolor;
+
+                // 点光源
+                color += GetAdditionalLightColor(brdfData, input.positionWS, mapNormal, viewDirection);
 
                 return half4(color, 1);
 

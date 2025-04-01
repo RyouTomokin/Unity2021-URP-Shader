@@ -167,8 +167,8 @@ namespace Tomokin
                     {
                         Undo.RecordObject(painter, "Remove Texture");
                         painter.terrainTextures.RemoveAt(sIndex);
-                        painter.SaveTerrainTexturesToTexture2DArray();      // 添加新层后保存一遍
-                        painter.UpdateWeightMaps();                         // 添加新层后刷新权重图
+                        painter.SaveTerrainTexturesToTexture2DArray();      // 删除层后保存一遍
+                        painter.UpdateWeightMaps();                         // 删除层后刷新权重图
 
                         // 确保索引不会越界
                         sIndex = Mathf.Clamp(sIndex, 0, painter.terrainTextures.Count - 1);

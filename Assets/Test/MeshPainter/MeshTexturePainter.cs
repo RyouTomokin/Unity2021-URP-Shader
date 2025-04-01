@@ -83,9 +83,10 @@ namespace Tomokin
 
         public float brushSize = 1.0f;
         private const float brushSizeDelta = 0.2f;
-        private float brushScale = 1.0f;
+        private float brushScale = 1.0f;                // 初始化时，对齐模型的尺寸
         public float brushStrength = 0.5f;
 
+        [HideInInspector] public static bool isSelected = false;
         [HideInInspector] public bool isPainting = false;
         [HideInInspector] public bool isSavedWeight = false;
         private double lastRepaintTime = 0; // 上次刷新的时间
@@ -134,8 +135,8 @@ namespace Tomokin
             get => Mathf.CeilToInt(terrainTextures.Count / (float)CHANNELS_PER_MAP);
         }
 
-        private int weightMapIndex = 0; // 记录是第几个Weight纹理
-        private int weightMapChannel = 0; // 记录是Weight纹理中RGBA哪一个通道
+        private int weightMapIndex = 0;     // 记录是第几个Weight纹理
+        private int weightMapChannel = 0;   // 记录是Weight纹理中RGBA哪一个通道
 
         private int _weightTextureSize = 2048;
         private int _terrainTextureSize = 1024;
@@ -175,11 +176,13 @@ namespace Tomokin
             InitializeTextures();       // 初始化权重贴图
             InitializeBrushScale();     // 根据模型的大小匹配笔刷大小
             SceneView.duringSceneGui += OnSceneGUI;
+            Selection.selectionChanged += UpdateIsSelected;
         }
 
         private void OnDisable()
         {
             SceneView.duringSceneGui -= OnSceneGUI;
+            Selection.selectionChanged -= UpdateIsSelected;
 
             DestroyImmediate(backupWeightMapArray);
             DestroyImmediate(paintRT);
@@ -245,19 +248,6 @@ namespace Tomokin
             }
         }
 
-        // private string GetControlMapName(int id, bool isCopy = false)
-        // {
-        //     if (isCopy)
-        //     {
-        //         return "ControlMap_" + id + "_copy.png";
-        //     }
-        //     else
-        //     {
-        //         return "ControlMap_" + id + ".png";
-        //     }
-        // }
-
-        // TODO 应当直接使用Array存储数据
         /// <summary>
         /// 把权重图链接到材质上
         /// </summary>
@@ -470,34 +460,67 @@ namespace Tomokin
 
         #endregion
 
+        private void UpdateIsSelected()
+        {
+            // 检查当前是否有 Painter 组件被选中
+            isSelected = false;
+            foreach (var obj in Selection.gameObjects)
+            {
+                if (obj.GetComponent<MeshTexturePainter>() != null)
+                {
+                    isSelected = true;
+                    break; // 只要找到一个，就不需要继续遍历
+                }
+            }
+
+            // 强制 SceneView 刷新，保证 Tools.hidden 及时更新
+            SceneView.RepaintAll();
+        }
+        
         private void OnSceneGUI(SceneView sceneView)
         {
-            if (!(isPainting && Selection.activeGameObject == gameObject))
+            if (Selection.activeGameObject == gameObject)
             {
-                Tools.hidden = false;
-                // 如果从选中对象变为其他或者关闭绘制，保存一次权重图
-                if (!isSavedWeight)
+                Tools.hidden = isPainting;
+                if (!isPainting)
                 {
-                    SaveWeightTextureArray();
-                    isSavedWeight = true;
+                    if (!isSavedWeight)
+                    {
+                        SaveWeightTextureArray();
+                        isSavedWeight = true;
+                    }
+                    return;
                 }
+            }
+            else
+            {
+                // 没有任何带此脚本的物体被选中
+                if(!isSelected) Tools.hidden = false;
                 return;
             }
 
-            Tools.hidden = true; // 隐藏移动、旋转、缩放 Gizmo
-            isSavedWeight = false;
+            // Tools.hidden = true; // 隐藏移动、旋转、缩放 Gizmo
 
             Event e = Event.current;
             if (e == null) return;
-
-            // 获取鼠标射线
-            Ray ray = HandleUtility.GUIPointToWorldRay(e.mousePosition);
-            RaycastHit hit;
             
             if (e.alt)
             {
                 return;
             }
+
+            // **Ctrl + 鼠标水平位移调整笔刷强度**
+            if (e.control && e.type == EventType.MouseMove)
+            {
+                brushStrength += e.delta.x * 0.001f; // 根据鼠标水平移动调整强度
+                brushStrength = Mathf.Clamp(brushStrength, 0.001f, 1f); // 限制范围
+
+                e.Use(); // 使用事件，防止 Unity 处理它
+            }
+
+            // 获取鼠标射线
+            Ray ray = HandleUtility.GUIPointToWorldRay(e.mousePosition);
+            RaycastHit hit;
 
             if (Physics.Raycast(ray, out hit))
             {
@@ -518,19 +541,20 @@ namespace Tomokin
                     }
                     Handles.color = new Color(0.6f, 0.6f, 0.9f, 1f);
                     Handles.DrawLine(hit.point, hit.point + hit.normal * brushSize);
-
+                    
                     // **Ctrl + 滚轮调整笔刷大小**
                     if (e.control && e.type == EventType.ScrollWheel)
                     {
                         brushSize += e.delta.y * -0.01f * brushSize;
-                        brushSize = Mathf.Clamp(brushSize, 0.01f, 10f); // 限制大小范围
+                        brushSize = Mathf.Clamp(brushSize, 0.01f, 10f);     // 限制大小范围
                         e.Use();
                     }
 
+                    // **[ ] 调整笔刷大小**
                     if (e.type == EventType.KeyDown && e.keyCode == KeyCode.LeftBracket)
                     {
                         brushSize -= brushSizeDelta;
-                        brushSize = Mathf.Clamp(brushSize, 0.01f, 10f); // 限制大小范围
+                        brushSize = Mathf.Clamp(brushSize, 0.01f, 10f);     // 限制大小范围
                         e.Use();
                     }
                     if (e.type == EventType.KeyDown && e.keyCode == KeyCode.RightBracket)
@@ -541,23 +565,6 @@ namespace Tomokin
                     }
 
                     // **绘制**
-                    // if ((e.type == EventType.MouseDrag || e.type == EventType.MouseDown) && e.button == 0)
-                    // {
-                    //
-                    //     if (e.shift)
-                    //     {
-                    //         // **Shift + 左键擦除**
-                    //         // EraseAtUV(hit.textureCoord);
-                    //     }
-                    //     else
-                    //     {
-                    //         // **左键绘制**
-                    //         PaintAtUV(hit.textureCoord);
-                    //     }
-                    //
-                    //     e.Use(); // 屏蔽默认框选行为
-                    // }
-                    
                     if (e.type == EventType.MouseDown && e.button == 0)
                     {
                         // 鼠标按下时，初始化
@@ -567,6 +574,9 @@ namespace Tomokin
                         // 刷新Handle
                         HandleUtility.Repaint();
                         _onMouseDone = true;
+                        
+                        // 如果有新的绘制，才会执行保存
+                        isSavedWeight = false;
                     }
 
                     if (e.type == EventType.MouseDrag && e.button == 0)
@@ -577,6 +587,7 @@ namespace Tomokin
                         HandleUtility.Repaint();
                     }
 
+                    // **刷新笔刷GUI**
                     if (e.type == EventType.MouseMove)
                     {
                         double currentTime = EditorApplication.timeSinceStartup;
@@ -594,22 +605,6 @@ namespace Tomokin
                 // 绘制
                 OnMouseUp();
                 _onMouseDone = false;
-                // TODO Undo笔刷
-                // Undo.RegisterCompleteObjectUndo(weightMaps[weightMapIndex], "Modify Texture");
-                //
-                // // 如果需要撤销，恢复备份，目前只支持回退一次
-                // Undo.undoRedoPerformed += () =>
-                // {
-                //     weightMaps[weightMapIndex].SetPixels(savedWeightMap.GetPixels());
-                //     weightMaps[weightMapIndex].Apply();
-                // };
-
-                // TODO 现在关闭及时保存
-                // string texturePath = CONTROL_MAP_PATH + GetControlMapName(weightMapIndex);
-                // SaveTextureAsPNG(weightMaps[weightMapIndex], texturePath);
-
-
-
                 // 刷新Handle
                 HandleUtility.Repaint();
                 // updateDebugGizmos = true;
@@ -620,9 +615,9 @@ namespace Tomokin
                 Event.current.keyCode == KeyCode.S)
             {
                 Debug.Log("检测到 Ctrl+S，保存纹理数据...");
-                SaveTerrainTexturesToTexture2DArray();          // 添加新层后保存一遍
-                UpdateWeightMaps();                             // 添加新层后刷新权重图
-                ConvertToPreviewTexture();
+                SaveTerrainTexturesToTexture2DArray();          // 保存纹理层
+                UpdateWeightMaps();                             // 刷新权重图
+                ConvertToPreviewTexture();                      // 刷新纹理预览
             }
             // HandleUtility.Repaint();
         }
@@ -746,7 +741,7 @@ namespace Tomokin
 
             if (backupWeightMapArray == null || paintRT == null || weightMapArrayRT == null) InitializeRT();
 
-            Undo.RegisterCompleteObjectUndo(weightMapArray, "Modify WeightMapArray");
+            Undo.RecordObject(weightMapArray, "Modify WeightMapArray");
             // 备份当前 weightMap
             Graphics.CopyTexture(weightMapArray, backupWeightMapArray);
             // SaveTextureArray(backupWeightMapArray, controlMapPath.Replace("_Control", "_1_Control"));
@@ -843,7 +838,7 @@ namespace Tomokin
         }
 
         /// <summary>
-        /// 把地形纹理打包为Array TODO 应该在添加或删除或替换纹理时自动保存，需要管理路径
+        /// 把地形纹理打包为Array
         /// </summary>
         public void SaveTerrainTexturesToTexture2DArray()
         {
