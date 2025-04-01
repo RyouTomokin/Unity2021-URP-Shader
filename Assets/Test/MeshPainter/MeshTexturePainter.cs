@@ -741,7 +741,7 @@ namespace Tomokin
 
             if (backupWeightMapArray == null || paintRT == null || weightMapArrayRT == null) InitializeRT();
 
-            Undo.RecordObject(weightMapArray, "Modify WeightMapArray");
+            Undo.RegisterCompleteObjectUndo(weightMapArray, "Modify WeightMapArray");
             // 备份当前 weightMap
             Graphics.CopyTexture(weightMapArray, backupWeightMapArray);
             // SaveTextureArray(backupWeightMapArray, controlMapPath.Replace("_Control", "_1_Control"));
