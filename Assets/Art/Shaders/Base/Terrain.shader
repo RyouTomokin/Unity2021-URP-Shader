@@ -445,7 +445,7 @@ Shader "KIIF/Terrain"
                     // 法线混合（简单加权，可能需要规范化）
                     mapNormal += terrainLayer[layerIndex].normal * w;
                     #endif
-                    mapSM = terrainLayer[layerIndex].sm;
+                    mapSM += terrainLayer[layerIndex].sm * w;
                 }
 
                 // 如果因为一些原因导致权重为0，则用第0层作为Base层渲染

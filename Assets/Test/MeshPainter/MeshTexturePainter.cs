@@ -510,12 +510,13 @@ namespace Tomokin
             }
 
             // **Ctrl + 鼠标水平位移调整笔刷强度**
-            if (e.control && e.type == EventType.MouseMove)
+            if (e.control && e.type == EventType.MouseDrag && e.button == 0)
             {
                 brushStrength += e.delta.x * 0.001f; // 根据鼠标水平移动调整强度
                 brushStrength = Mathf.Clamp(brushStrength, 0.001f, 1f); // 限制范围
 
                 e.Use(); // 使用事件，防止 Unity 处理它
+                return;
             }
 
             // 获取鼠标射线
@@ -565,7 +566,7 @@ namespace Tomokin
                     }
 
                     // **绘制**
-                    if (e.type == EventType.MouseDown && e.button == 0)
+                    if (e.type == EventType.MouseDown && e.button == 0 && !e.control)
                     {
                         // 鼠标按下时，初始化
                         OnMouseDown();
@@ -579,7 +580,7 @@ namespace Tomokin
                         isSavedWeight = false;
                     }
 
-                    if (e.type == EventType.MouseDrag && e.button == 0)
+                    if (e.type == EventType.MouseDrag && e.button == 0 && !e.control)
                     {
                         // 绘制
                         OnMouseDrag(hit.textureCoord);
@@ -600,7 +601,7 @@ namespace Tomokin
                 }
             }
 
-            if (e.type == EventType.MouseUp && e.button == 0)
+            if (e.type == EventType.MouseUp && e.button == 0 && _onMouseDone)
             {
                 // 绘制
                 OnMouseUp();
@@ -871,7 +872,10 @@ namespace Tomokin
 
             tempLoadTextureArray = LoadTextureArray(normalMapPath);
             if (material.HasProperty("_BumpMap"))
+            {
                 material.SetTexture("_BumpMap", tempLoadTextureArray);
+                material.EnableKeyword("_NORMALMAP");
+            }
             else
                 Debug.LogWarning("Shader 没有_BumpMap参数");
 
