@@ -284,10 +284,7 @@ namespace Tomokin
         {
             if (terrainTextures.Count == 0 || GetComponent<MeshRenderer>() == null) return;
 
-            if (_material == null)
-            {
-                _material = GetComponent<MeshRenderer>()?.sharedMaterial;
-            }
+            _material = GetComponent<MeshRenderer>()?.sharedMaterial;
             // 获取材质完整路径
             string fullPath = AssetDatabase.GetAssetPath(_material);
             // 仅获取所在文件夹路径
