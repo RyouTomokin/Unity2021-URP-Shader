@@ -7,6 +7,7 @@ using System.IO;
 
 namespace Tomokin
 {
+#if UNITY_EDITOR
     [CustomEditor(typeof(MeshTexturePainter))]
     public class MeshTexturePainterEditor : Editor
     {
@@ -136,7 +137,7 @@ namespace Tomokin
                 EditorGUILayout.LabelField("地形纹理", EditorStyles.boldLabel);
                 Texture2D[] terrainPreview = painter.terrainPreview;
 
-                int textureCount = painter.terrainTextures.Count;
+                int textureCount = painter.terrainPreview.Length;
                 int sIndex = painter.selectedIndex;
                 int gridHeight = (int)((float)textureCount / painter.controlChannels + 0.9f) * 90; // 计算网格高度
 
@@ -177,8 +178,53 @@ namespace Tomokin
                         isTextureChangede = true;
                     }
                 }
+
+                if (GUILayout.Button("保存地形层数据", GUILayout.Width(100)))
+                {
+                    if (painter.terrainAsset == null)
+                    {
+                        string path = painter.GetPath;
+                        path += painter.gameObject.name + "TerrainTextureData.asset";
+                        if (!string.IsNullOrEmpty(path))
+                        {
+                            TerrainTextureSaver.SaveTerrainTextures(painter.terrainTextures, path);
+                        }
+
+                        painter.terrainAsset = AssetDatabase.LoadAssetAtPath<TerrainTextureAsset>(path);
+                    }
+                    else
+                    {
+                        EditorUtility.SetDirty(painter.terrainAsset);
+                        AssetDatabase.SaveAssets();
+                        AssetDatabase.Refresh();
+                    }
+                }
+
+                if (GUILayout.Button("加载地形层数据", GUILayout.Width(100)))
+                {
+                    if (painter.terrainAsset != null)
+                    {
+                        AssetDatabase.Refresh();
+                        string path = AssetDatabase.GetAssetPath(painter.terrainAsset);
+                        Debug.Log($"path={path}");
+                        painter.terrainAsset = AssetDatabase.LoadAssetAtPath<TerrainTextureAsset>(path);
+                        painter.terrainTextures = painter.terrainAsset.terrainTextures;
+                        terrainPreview = painter.ConvertToPreviewTexture();
+                        painter.SaveTerrainTexturesToTexture2DArray();
+                        painter.UpdateWeightMaps();
+                        Debug.Log("加载地形数据");
+                    }
+                    else
+                    {
+                        Debug.LogWarning("没有指定地形数据");
+                    }
+                }
+
                 GUI.enabled = true;
                 GUILayout.EndHorizontal();
+
+                painter.terrainAsset = (TerrainTextureAsset)EditorGUILayout.ObjectField(
+                    "地形层数据", painter.terrainAsset, typeof(TerrainTextureAsset), false);
 
                 // **显示纹理列表**
                 if (textureCount > 0 && terrainPreview != null && terrainPreview.Length > 0)
@@ -235,7 +281,7 @@ namespace Tomokin
                             Debug.Log("Albedo Map 修改了！");
                         }
                         EditorGUILayout.EndHorizontal();
-                        
+
                         // ** 法线纹理 **
                         EditorGUILayout.BeginHorizontal();
                         EditorGUILayout.LabelField("Normal Map", GUILayout.Width(100));
@@ -376,12 +422,6 @@ namespace Tomokin
                     if (GUILayout.Button("保存权重图", GUILayout.Width(150)))
                     {
                         painter.UpdateWeightMaps();
-                        // 如果正处在编辑模式，重新初始化RT
-                        if (painter.isPainting)
-                        {
-                            painter.ClearRT();
-                            painter.InitializeRT();
-                        }
                     }
 
                     GUILayout.EndHorizontal();
@@ -395,7 +435,7 @@ namespace Tomokin
             serializedObject.ApplyModifiedProperties();
         }
     }
-    
+
     // 在纹理修改时，重新导入触发保存
     // public class TextureReimportChecker : AssetPostprocessor
     // {
@@ -432,4 +472,5 @@ namespace Tomokin
     //         }
     //     }
     // }
+#endif
 }

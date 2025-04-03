@@ -11,30 +11,33 @@ using UnityEngine.Rendering;
 
 namespace Tomokin
 {
+#if UNITY_EDITOR
+
     [RequireComponent(typeof(MeshCollider))]
     [ExecuteInEditMode]
     public class MeshTexturePainter : MonoBehaviour
     {
         // public List<Texture2D> terrainTextures = new List<Texture2D>(); // 地形纹理列表
         public List<TerrainTexture> terrainTextures = new List<TerrainTexture>();
+        public TerrainTextureAsset terrainAsset;
         public Texture2D[] terrainPreview;
 
-        [Serializable]
-        public class TerrainTexture
-        {
-            public Texture2D albedoMap;
-            public Texture2D normalMap;
-            public Texture2D maskMap;
-            public float tilling;
-
-            public TerrainTexture(Texture2D albedo = null)
-            {
-                this.albedoMap = albedo;
-                this.normalMap = null;
-                this.maskMap = null;
-                this.tilling = 1;
-            }
-        }
+        // [Serializable]
+        // public class TerrainTexture
+        // {
+        //     public Texture2D albedoMap;
+        //     public Texture2D normalMap;
+        //     public Texture2D maskMap;
+        //     public float tilling;
+        //
+        //     public TerrainTexture(Texture2D albedo = null)
+        //     {
+        //         this.albedoMap = albedo;
+        //         this.normalMap = null;
+        //         this.maskMap = null;
+        //         this.tilling = 1;
+        //     }
+        // }
 
         public void AddTerrainTexture()
         {
@@ -44,8 +47,9 @@ namespace Tomokin
             }
             else
             {
-                terrainTextures.Insert(selectedIndex + 1, new TerrainTexture());
-                selectedIndex++;
+                // terrainTextures.Insert(selectedIndex + 1, new TerrainTexture());
+                // selectedIndex++;
+                terrainTextures.Add(new TerrainTexture());
             }
         }
 
@@ -154,6 +158,8 @@ namespace Tomokin
         // 会随着材质球的路径变化而变化
         private string CONTROL_MAP_PATH = "Assets/ControlMaps/";
 
+        public string GetPath => CONTROL_MAP_PATH;
+
         private string controlMapName => "T_" + gameObject.name + "_Control";
         private string controlMapPath => CONTROL_MAP_PATH + controlMapName + ".asset";
         private string albedoMapName => "T_" + gameObject.name + "_D";     // Albedo
@@ -256,7 +262,7 @@ namespace Tomokin
             // material = GetComponent<MeshRenderer>().sharedMaterial;
             if (weightMapArray == null)
             {
-                Debug.LogError("shikongde");
+                Debug.LogError("没有权重图");
             }
             if (material.HasProperty("_ControlMap"))
             {
@@ -298,6 +304,12 @@ namespace Tomokin
         /// </summary>
         public void UpdateWeightMaps()
         {
+            // 如果正处在编辑模式，重新初始化RT
+            if (isPainting)
+            {
+                ClearRT();
+                InitializeRT();
+            }
             Debug.Log("更新权重图。");
 
             if (!Directory.Exists(CONTROL_MAP_PATH))
@@ -501,6 +513,16 @@ namespace Tomokin
             Event e = Event.current;
             if (e == null) return;
             
+            if (e.type == EventType.KeyUp && 
+                e.control && 
+                e.keyCode == KeyCode.S)
+            {
+                Debug.Log("检测到 Ctrl+S，保存纹理数据...");
+                SaveTerrainTexturesToTexture2DArray();          // 保存纹理层
+                UpdateWeightMaps();                             // 刷新权重图
+                ConvertToPreviewTexture();                      // 刷新纹理预览
+            }
+            
             if (e.alt)
             {
                 return;
@@ -606,16 +628,6 @@ namespace Tomokin
                 // 刷新Handle
                 HandleUtility.Repaint();
                 // updateDebugGizmos = true;
-            }
-            
-            if (Event.current.type == EventType.KeyUp && 
-                Event.current.control && 
-                Event.current.keyCode == KeyCode.S)
-            {
-                Debug.Log("检测到 Ctrl+S，保存纹理数据...");
-                SaveTerrainTexturesToTexture2DArray();          // 保存纹理层
-                UpdateWeightMaps();                             // 刷新权重图
-                ConvertToPreviewTexture();                      // 刷新纹理预览
             }
             // HandleUtility.Repaint();
         }
@@ -853,7 +865,7 @@ namespace Tomokin
             TextureArrayGenerator.CreateAndSaveTextureArray(normalTextures, normalMapPath, _terrainTextureSize);
 
             Texture2D defaultMask = new Texture2D(1, 1, _textureFormat, false);
-            defaultMask.SetPixel(0, 0, new Color(0f, 0f, 0f, 0f)); // 光滑 0 金属 0
+            defaultMask.SetPixel(0, 0, new Color(0f, 0f, 0f, 1f)); // 光滑 0 金属 0
             defaultMask.Apply();
             List<Texture2D> maskTextures =
                 terrainTextures.Select(t => t.maskMap != null ? t.maskMap : defaultMask).ToList();
@@ -922,9 +934,9 @@ namespace Tomokin
         {
             if (newTexture == null)
             {
-                Debug.LogWarning($"Texture at index {selectedIndex} is null, using a black texture.");
+                Debug.LogWarning($"Texture at index {selectedIndex} is null, default normal texture.");
                 newTexture = new Texture2D(1, 1, _textureFormat, false);
-                newTexture.SetPixel(0, 0, Color.black);
+                newTexture.SetPixel(0, 0, new Color(1.0f, 0.5f, 0.5f, 0.5f));
                 newTexture.Apply();
             }
             UpdateTextureInArray(newTexture, selectedIndex, normalMapPath);
@@ -1025,4 +1037,6 @@ namespace Tomokin
             }
         }
     }
+
+#endif
 }
