@@ -182,6 +182,10 @@
             Varyings vert(Attributes input)
             {
                 Varyings output = (Varyings)0;
+                
+                UNITY_SETUP_INSTANCE_ID(input);
+                UNITY_TRANSFER_INSTANCE_ID(input, output);
+                UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(output);
 
                 // 在局部空间做顶点动画
                 // float3 windPosition = Wind(input.positionOS.xyz);
@@ -210,10 +214,6 @@
                 // output.positionCS = vertexInput.positionCS;
                 output.positionCS = positionCS;
                 output.positionWS = positionWS;
-
-                UNITY_SETUP_INSTANCE_ID(input);
-                UNITY_TRANSFER_INSTANCE_ID(input, output);
-                UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(output);
 
                 return output;
             }
