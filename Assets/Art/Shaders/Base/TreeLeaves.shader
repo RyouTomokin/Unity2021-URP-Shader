@@ -267,7 +267,8 @@
 
                 float4 shadowCoord = TransformWorldToShadowCoord(input.positionWS); //主光计算阴影
                 Light mainLight = GetMainLight(shadowCoord);
-                mainLight.direction = lerp(mainLight.direction, SafeNormalize(_VirtualSunDirection.xyz), _VirtualSunDirection.w);
+                // 如果_VirtualSunDirection.xyz是0，普通Normalize会造成闪烁，且lerp结果会出错
+                mainLight.direction = lerp(mainLight.direction, SafeNormalize(_VirtualSunDirection.xyz + HALF_MIN), _VirtualSunDirection.w);
                 mainLight.color += _VirtualSunColor;
                 float3 normalWS = input.normalWS;
                 float3 viewDirectionWS = input.viewDirWS;
