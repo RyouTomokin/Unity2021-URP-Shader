@@ -12,6 +12,10 @@
         _FarDistance ("Far Distance", Float) = 25.0
         _DitherScale ("DitherScale", Float) = 1.5
 
+        _VirtualSunColor ("VirtualSunColor", Color) = (0, 0, 0, 0)
+        _VirtualSunDirection ("VirtualSunDirection", Vector) = (0, 0, 0, 0)
+
+        [Space(20)]
         _ColorSaturate ("Color Saturate", Range(0.0, 1.0)) = 1
         [MainColor] _BaseColor("Color", Color) = (1,1,1,1)
         _ShadowColor("Shadow Color", Color) = (1,1,1,1)
@@ -52,6 +56,9 @@
         half4 _BaseColor;
         half4 _ShadowColor;
         half _Cutoff;
+
+        half4 _VirtualSunDirection;
+        half4 _VirtualSunColor;
 
         half _NearDistance;
         half _FarDistance;
@@ -182,7 +189,7 @@
             Varyings vert(Attributes input)
             {
                 Varyings output = (Varyings)0;
-                
+
                 UNITY_SETUP_INSTANCE_ID(input);
                 UNITY_TRANSFER_INSTANCE_ID(input, output);
                 UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(output);
@@ -260,6 +267,8 @@
 
                 float4 shadowCoord = TransformWorldToShadowCoord(input.positionWS); //主光计算阴影
                 Light mainLight = GetMainLight(shadowCoord);
+                mainLight.direction = lerp(mainLight.direction, SafeNormalize(_VirtualSunDirection.xyz), _VirtualSunDirection.w);
+                mainLight.color += _VirtualSunColor;
                 float3 normalWS = input.normalWS;
                 float3 viewDirectionWS = input.viewDirWS;
                 // half3 directLightColor = LightingPhysicallyBased(brdfData, mainLight, normalWS, viewDirectionWS);

@@ -7,9 +7,11 @@ using System.IO;
 namespace Tomokin
 {
 #if UNITY_EDITOR
+    [CreateAssetMenu(fileName = "NewTerrainTextureData", menuName = "TerrainTextureAsset", order = 1001)]
     public class TerrainTextureAsset : ScriptableObject
     {
         public List<TerrainTexture> terrainTextures;
+        [HideInInspector]public string assetName = "New";
     }
     
     [Serializable]
