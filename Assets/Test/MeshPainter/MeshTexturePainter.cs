@@ -181,8 +181,17 @@ namespace Tomokin
             InitializeComputeShader();  // 获取绘制使用的ComputeShader
             InitializeTextures();       // 初始化权重贴图
             InitializeBrushScale();     // 根据模型的大小匹配笔刷大小
+            ConvertToPreviewTexture();  // 初始化预览图
+            SceneView.duringSceneGui -= OnSceneGUI;
             SceneView.duringSceneGui += OnSceneGUI;
+            
+            Selection.selectionChanged -= UpdateIsSelected;
             Selection.selectionChanged += UpdateIsSelected;
+        }
+
+        public void ManualInitialize()
+        {
+            OnEnable();
         }
 
         private void OnDisable()
@@ -197,6 +206,11 @@ namespace Tomokin
             isPainting = false;
             Tools.hidden = false;
             // SaveWeightTextureArray();
+        }
+
+        private void OnDestroy()
+        {
+            OnDisable();
         }
 
         private void InitializeComputeShader()

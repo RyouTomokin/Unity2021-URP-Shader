@@ -136,8 +136,8 @@ namespace Tomokin
                 // ================ 地形纹理管理 ================
                 EditorGUILayout.LabelField("地形纹理", EditorStyles.boldLabel);
                 Texture2D[] terrainPreview = painter.terrainPreview;
-
-                int textureCount = painter.terrainPreview.Length;
+                int textureCount = 0;
+                if (terrainPreview != null) textureCount = terrainPreview.Length;
                 int sIndex = painter.selectedIndex;
                 int gridHeight = (int)((float)textureCount / painter.controlChannels + 0.9f) * 90; // 计算网格高度
 
@@ -213,6 +213,8 @@ namespace Tomokin
                         painter.SaveTerrainTexturesToTexture2DArray();
                         painter.UpdateWeightMaps();
                         Debug.Log("加载地形数据");
+                        painter.ManualInitialize();
+                        Debug.Log("初始化");
                     }
                     else
                     {
