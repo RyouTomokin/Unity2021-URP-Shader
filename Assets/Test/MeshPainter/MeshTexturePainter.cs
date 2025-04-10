@@ -176,6 +176,26 @@ namespace Tomokin
         private RenderTexture paintRT; // 记录当前绘制路径
         private RenderTexture weightMapArrayRT; // 记录当前绘制路径
 
+        private void Reset()
+        {
+            if (GetComponent<MeshRenderer>() == null)
+            {
+                Debug.LogWarning("没有MeshRenderer");
+                return;
+            }
+            // 新建组件时初始化材质球和路径
+            _material = GetComponent<MeshRenderer>()?.sharedMaterial;
+            if (_material == null)
+            {
+                Debug.LogWarning("没有材质球，请添加后重新启用组件以更新纹理保存路径");
+                return;
+            }
+            // 获取材质完整路径
+            string fullPath = AssetDatabase.GetAssetPath(_material);
+            // 仅获取所在文件夹路径
+            CONTROL_MAP_PATH = Path.GetDirectoryName(fullPath).Replace("\\", "/") + "/";
+        }
+
         private void OnEnable()
         {
             InitializeComputeShader();  // 获取绘制使用的ComputeShader

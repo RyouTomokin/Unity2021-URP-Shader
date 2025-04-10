@@ -60,7 +60,9 @@ Shader "KIIF/Terrain"
             #pragma shader_feature_local_fragment  _ALPHATEST_ON
             #pragma shader_feature_local _NORMALMAP
             // #pragma shader_feature_local_fragment  _SMAEMAP
-            #pragma shader_feature_local_fragment  _BAKEMODE
+            #pragma shader_feature_local_fragment  _BAKEMODECOLOR
+            #pragma shader_feature_local_fragment  _BAKEMODENORMAL
+            #pragma shader_feature_local_fragment  _BAKEMODEMASK
 
             // -------------------------------------
             // Universal Pipeline keywords
@@ -363,7 +365,7 @@ Shader "KIIF/Terrain"
                 }
 
                 float2 controlUV = input.uv;
-                #ifdef _BAKEMODE
+                #if defined(_BAKEMODECOLOR) || defined(_BAKEMODENORMAL) || defined(_BAKEMODEMASK)
                 controlUV = TRANSFORM_TEX(input.uv, _BaseMap);
                 #endif
 
@@ -465,10 +467,19 @@ Shader "KIIF/Terrain"
                 // return half4(mapNormal,1);
                 // #endif
 
-                #ifdef _BAKEMODE
+                #ifdef _BAKEMODECOLOR
                 return mapColor;
                 #endif
 
+                #if defined(_BAKEMODENORMAL) && defined(_NORMALMAP)
+                mapNormal = mapNormal * 0.5 + 0.5;
+                mapNormal = pow(mapNormal, 2.2);
+                return half4(mapNormal, 1);
+                #endif
+                
+                #if defined(_BAKEMODEMASK)
+                return half4(mapSM,1);
+                #endif
 
 
                 #if defined(_NORMALMAP)
