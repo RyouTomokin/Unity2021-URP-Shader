@@ -37,6 +37,8 @@ namespace Tomokin
         private float alphaGL = 0.2f;
 
         private bool isBaked;
+        private bool bakeNormal;
+        private bool bakeMask;
 
         private string _path
         {
@@ -69,7 +71,7 @@ namespace Tomokin
             }
         }
 
-        [MenuItem("Game Framework/关卡配置/地形/地形切割工具")]
+        [MenuItem("Tools/地形切割工具")]
         public static void ShowWindow()
         {
             GetWindow<MeshCutterEditor>("地形切割工具");
@@ -207,6 +209,14 @@ namespace Tomokin
             resolution = resolutionOptionsValue[resolutionSelectedIndex];
 
             selectedShaderStyle  = (ShaderStyle)EditorGUILayout.EnumPopup("选择 Shader 类型", selectedShaderStyle);
+            
+            // 在按钮上方添加一排复选框
+            EditorGUILayout.BeginHorizontal();
+
+            bakeNormal = GUILayout.Toggle(bakeNormal, "烘焙法线", GUILayout.Width(100));
+            bakeMask = GUILayout.Toggle(bakeMask, "烘焙光滑金属", GUILayout.Width(100));
+
+            EditorGUILayout.EndHorizontal();
 
             if (GUILayout.Button("烘焙贴图并修改Mesh UV"))
             {
@@ -474,19 +484,19 @@ namespace Tomokin
                 Vector2 newO;
                 if (_submeshInfos[i].maxLength == 0)
                     UVRemapping(mesh, out _submeshInfos[i].maxLength, out _submeshInfos[i].newO);
-                // TODO 烘焙颜色和法线贴图
-                TerrainBakeMaterialGen(_submeshInfos[i], terrainMaterial, resolution, _path);
+                
+                TerrainBakeMaterialGen(_submeshInfos[i], terrainMaterial, resolution, _path, bakeNormal, bakeMask);
             }
 
             isBaked = true;
         }
 
-        static void TerrainBakeMaterialGen(SubmeshInfo sub, Material bakeMat, int size, string path)
+        static void TerrainBakeMaterialGen(SubmeshInfo sub, Material bakeMat, int size, string path, bool bakeNormal = true, bool bakeMask = true)
         {
-            TerrainBakeMaterialGen(sub.gameObject, bakeMat, sub.newO, sub.maxLength, size, path);
+            TerrainBakeMaterialGen(sub.gameObject, bakeMat, sub.newO, sub.maxLength, size, path, bakeNormal, bakeMask);
         }
 
-        static void TerrainBakeMaterialGen(GameObject terrain, Material bakeMat, Vector2 newO, float l, int size, string path)
+        static void TerrainBakeMaterialGen(GameObject terrain, Material bakeMat, Vector2 newO, float l, int size, string path, bool bakeNormal, bool bakeMask)
         {
             // 创建临时RT存储贴图数据
             RenderTexture renderTexture = new RenderTexture(size, size, 0);
@@ -539,17 +549,23 @@ namespace Tomokin
             
             RenderTexture.active = normalRT;
             string normalMapPath = $"/{path}T_{terrain.name}_N.png";
-            Texture2D pngNormal = new Texture2D(size, size, TextureFormat.ARGB32, false);
-            pngNormal.ReadPixels(new Rect(0, 0, size, size), 0, 0);
-            // File.WriteAllBytes(Application.dataPath + $"/{path.Remove(0, "Assets".Length)}{terrain.name}.png", bytes);
-            File.WriteAllBytes(Application.dataPath + normalMapPath, pngNormal.EncodeToPNG());
-            
+            if (bakeNormal)
+            {
+                Texture2D pngNormal = new Texture2D(size, size, TextureFormat.ARGB32, false);
+                pngNormal.ReadPixels(new Rect(0, 0, size, size), 0, 0);
+                // File.WriteAllBytes(Application.dataPath + $"/{path.Remove(0, "Assets".Length)}{terrain.name}.png", bytes);
+                File.WriteAllBytes(Application.dataPath + normalMapPath, pngNormal.EncodeToPNG());
+            }
+
             RenderTexture.active = maskRT;
             string maskMapPath = $"/{path}T_{terrain.name}_SM.png";
-            Texture2D pngMask = new Texture2D(size, size, TextureFormat.ARGB32, false);
-            pngMask.ReadPixels(new Rect(0, 0, size, size), 0, 0);
-            // File.WriteAllBytes(Application.dataPath + $"/{path.Remove(0, "Assets".Length)}{terrain.name}.png", bytes);
-            File.WriteAllBytes(Application.dataPath + maskMapPath, pngMask.EncodeToPNG());
+            if (bakeMask)
+            {
+                Texture2D pngMask = new Texture2D(size, size, TextureFormat.ARGB32, false);
+                pngMask.ReadPixels(new Rect(0, 0, size, size), 0, 0);
+                // File.WriteAllBytes(Application.dataPath + $"/{path.Remove(0, "Assets".Length)}{terrain.name}.png", bytes);
+                File.WriteAllBytes(Application.dataPath + maskMapPath, pngMask.EncodeToPNG());
+            }
 
             AssetDatabase.Refresh();
 
@@ -562,18 +578,24 @@ namespace Tomokin
             TextureImporter textureImporter = AssetImporter.GetAtPath(colorMapPath) as TextureImporter;
             textureImporter.wrapMode = TextureWrapMode.Clamp;
             textureImporter.SaveAndReimport();
-            
-            textureImporter = AssetImporter.GetAtPath(normalMapPath) as TextureImporter;
-            textureImporter.textureType = TextureImporterType.NormalMap;
-            textureImporter.wrapMode = TextureWrapMode.Clamp;
-            textureImporter.sRGBTexture = false;
-            textureImporter.SaveAndReimport();
-            
-            textureImporter = AssetImporter.GetAtPath(maskMapPath) as TextureImporter;
-            textureImporter.wrapMode = TextureWrapMode.Clamp;
-            textureImporter.sRGBTexture = false;
-            textureImporter.SaveAndReimport();
-            
+
+            if (bakeNormal)
+            {
+                textureImporter = AssetImporter.GetAtPath(normalMapPath) as TextureImporter;
+                textureImporter.textureType = TextureImporterType.NormalMap;
+                textureImporter.wrapMode = TextureWrapMode.Clamp;
+                textureImporter.sRGBTexture = false;
+                textureImporter.SaveAndReimport();
+            }
+
+            if (bakeMask)
+            {
+                textureImporter = AssetImporter.GetAtPath(maskMapPath) as TextureImporter;
+                textureImporter.wrapMode = TextureWrapMode.Clamp;
+                textureImporter.sRGBTexture = false;
+                textureImporter.SaveAndReimport();
+            }
+
             AssetDatabase.Refresh();
 
             // 创建新的材质球，并赋予刚才的贴图
@@ -594,8 +616,8 @@ namespace Tomokin
 
             finalMat.SetFloat("_Smoothness", 0);
             finalMat.mainTexture = AssetDatabase.LoadAssetAtPath<Texture2D>(colorMapPath);
-            finalMat.SetTexture("_BumpMap",AssetDatabase.LoadAssetAtPath<Texture2D>(normalMapPath));
-            finalMat.SetTexture( "_SMAEMap",AssetDatabase.LoadAssetAtPath<Texture2D>(maskMapPath));
+            if(bakeNormal) finalMat.SetTexture("_BumpMap",AssetDatabase.LoadAssetAtPath<Texture2D>(normalMapPath));
+            if (bakeMask) finalMat.SetTexture("_SMAEMap", AssetDatabase.LoadAssetAtPath<Texture2D>(maskMapPath));
 
             AssetDatabase.CreateAsset(finalMat, $"{path}{terrain.name}.mat");
 
@@ -604,8 +626,8 @@ namespace Tomokin
 
             //清理PNG数据
             Texture2D.DestroyImmediate(pngColor);
-            Texture2D.DestroyImmediate(pngNormal);
-            Texture2D.DestroyImmediate(pngMask);
+            // Texture2D.DestroyImmediate(pngNormal);
+            // Texture2D.DestroyImmediate(pngMask);
         }
 
         private void OnSceneGUI(SceneView sceneView)
