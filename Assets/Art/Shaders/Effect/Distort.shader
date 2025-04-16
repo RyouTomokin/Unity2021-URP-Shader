@@ -276,7 +276,7 @@ Shader "KIIF/Effect/Distort"
                 dissolve = saturate(dissolve);
 
                 half3 dissolveSideColor = dissolveSide * _DissolveSideColor.rgb;
-                color *= dissolve;
+                color.a *= dissolve;
                 color.rgb += dissolveSideColor;
 
                 // 遮罩

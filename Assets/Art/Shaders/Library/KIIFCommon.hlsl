@@ -122,7 +122,7 @@ half2 RefractionEta(half3 viewDirWS, half3 normalWS, half eta)
 }
 
 /**
- * \brief 
+ * \brief
  * \param In 输入值
  * \param Contrast 对比度,0为原本效果
  * \return 输出值
@@ -152,8 +152,49 @@ float2 BumpOffset(float3x3 tangentToWorld, float3 cameraDir, float2 uv, float he
     float _H = heightRatio * (height - plane);
     float3 viewTS = mul(tangentToWorld, cameraDir);
     float2 bumpUV = uv + viewTS.rg * _H;
-    
+
     return bumpUV;
+}
+
+/**
+ * \brief ASE的Flow节点
+ * \param tex 被Flow的纹理
+ * \param sampler Base采样器
+ * \param UV BaseUV
+ * \param FlowDirection Flow的方向 FlowMap
+ * \param FlowStrength Flow强度
+ * \param FlowSpeed Flow的时间速度
+ * \return
+ */
+half4 Flow(TEXTURE2D_PARAM(tex, samp), float2 UV, float2 FlowDirection, float2 FlowStrength = float2(1,1), float FlowSpeed = 0.2)
+{
+    float time = _Time.y * FlowSpeed;
+    float2 flowDir = -(FlowDirection * 2 - 1) * FlowStrength;
+    float2 UV1 = UV + flowDir * frac(time);
+    float2 UV2 = UV + flowDir * frac(time+0.5);
+    half4 map1 = SAMPLE_TEXTURE2D(tex, samp, UV1);
+    half4 map2 = SAMPLE_TEXTURE2D(tex, samp, UV2);
+
+    return lerp(map1, map2, abs(frac(time) - 0.5) * 2);
+}
+
+/**
+ * \brief ASE的PolarCoordinates节点
+ * \param UV 原始UV
+ * \param Center 转为极坐标的中心
+ * \param RadialScale 半径的缩放
+ * \param LengthScale -1~1，顺时针从6点钟方向开始
+ * \return 输出极坐标UV
+ */
+float2 PolarCoordinates(float2 UV, float2 Center = float2(0.5, 0.5), float RadialScale = 1, float LengthScale = 1)
+{
+    UV -= Center;
+    // scale of distance value    radius = length(delta) * 2 * RadialScale
+    float radius = length(UV) * 2 * RadialScale;
+    // angle = atan2(delta.x, delta.y) * 1.0 / 6.28 * LengthScale
+    float angle = atan2(UV.x, UV.y) * INV_TWO_PI * LengthScale;
+
+    return float2(radius, angle);
 }
 
 #endif
