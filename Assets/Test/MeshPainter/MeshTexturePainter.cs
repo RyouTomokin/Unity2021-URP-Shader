@@ -622,9 +622,9 @@ namespace Tomokin
                     if (e.type == EventType.MouseDown && e.button == 0 && !e.control)
                     {
                         // 鼠标按下时，初始化
-                        OnMouseDown();
+                        OnEditorMouseDown();
                         // 绘制
-                        OnMouseDrag(hit.textureCoord);
+                        OnEditorMouseDrag(hit.textureCoord);
                         // 刷新Handle
                         HandleUtility.Repaint();
                         _onMouseDone = true;
@@ -636,7 +636,7 @@ namespace Tomokin
                     if (e.type == EventType.MouseDrag && e.button == 0 && !e.control)
                     {
                         // 绘制
-                        OnMouseDrag(hit.textureCoord);
+                        OnEditorMouseDrag(hit.textureCoord);
                         // 刷新Handle
                         HandleUtility.Repaint();
                     }
@@ -657,7 +657,7 @@ namespace Tomokin
             if (e.type == EventType.MouseUp && e.button == 0 && _onMouseDone)
             {
                 // 绘制
-                OnMouseUp();
+                OnEditorMouseUp();
                 _onMouseDone = false;
                 // 刷新Handle
                 HandleUtility.Repaint();
@@ -779,7 +779,7 @@ namespace Tomokin
                 weightMapArrayRT.Release();
         }
 
-        private void OnMouseDown()
+        private void OnEditorMouseDown()
         {
             if (weightMapArray.depth == 0 || weightMapArray == null) return;
 
@@ -800,7 +800,7 @@ namespace Tomokin
         /// <summary>
         /// ComputeShader RT绘制
         /// </summary>
-        private void OnMouseDrag(Vector2 uv)
+        private void OnEditorMouseDrag(Vector2 uv)
         {
             if (weightMapArray.depth == 0 || weightMapArray == null) return;
 
@@ -855,7 +855,7 @@ namespace Tomokin
             });
         }
 
-        private void OnMouseUp()
+        private void OnEditorMouseUp()
         {
             AsyncGPUReadback.Request(weightMapArrayRT, 0, 0, weightMapArrayRT.width, 0, weightMapArrayRT.height, 0,
                 weightMapArrayRT.volumeDepth, request =>

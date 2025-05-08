@@ -77,7 +77,8 @@ MonoBehaviour:
   - {fileID: -3867463416408842293}
   - {fileID: 1770478741548311423}
   - {fileID: 8416141971572664448}
-  m_RendererFeatureMap: adc0de57c6d2eee5333dd192a1b461aecbdf2173830254ca7f235ef8080192188028d8528824cc74
+  - {fileID: 9024749620166576993}
+  m_RendererFeatureMap: adc0de57c6d2eee5333dd192a1b461aecbdf2173830254ca7f235ef8080192188028d8528824cc7461cbdee0f6593e7d
   m_UseNativeRenderPass: 0
   postProcessData: {fileID: 11400000, guid: 41439944d30ece34e96484bdb6645b55, type: 2}
   xrSystemData: {fileID: 11400000, guid: 60e1133243b97e347b653163a8c01b64, type: 2}
@@ -151,3 +152,19 @@ MonoBehaviour:
     renderPassEvent: 500
     materia: {fileID: 2100000, guid: 28b272c4700bc8e4f9a4bb9d3be98ffa, type: 2}
     EnableInEditMode: 0
+--- !u!114 &9024749620166576993
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b233c1fad02f5834fa9cab74b85ca672, type: 3}
+  m_Name: FreezeBlurRendererFeature
+  m_EditorClassIdentifier: 
+  m_Active: 1
+  settings:
+    blurMaterial: {fileID: 2100000, guid: 8b563715942ee7d418fa7b7f9bd10fe2, type: 2}
+    freezeDuration: 10
