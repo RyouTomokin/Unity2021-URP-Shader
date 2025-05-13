@@ -5,10 +5,14 @@ Shader "KIIF/Effect/Distort"
         [MainColor][HDR] _BaseColor("Color", Color) = (1,1,1,1)
         _Brighten("提亮", Range(0, 5)) = 1
         [Toggle] _SelfMask("自我遮罩", Float) = 0
+        [Toggle] _BaseUVByCustomOn("启用自定义UV(UV1.xy)", Float) = 0.0
         [MainTexture] _BaseMap("Albedo", 2D) = "white" {}
         _MainSpeed("主贴图流动速度", Vector) = (0,0,0,0)
         [Toggle] _MainClampEnabled("__mainclamp", Float) = 0.0
         _MainClamp("主贴图Clamp", Vector) = (0,0,1,1)
+        
+        _DetailMap("细节纹理", 2D) = "black" {}
+        
         _Cutoff("Alpha Cutoff", Range(0.0, 1.0)) = 0
         [Toggle] _SoftParticlesEnabled("__softparticlesenabled", Float) = 0.0
         _SoftParticle("软粒子", Range(0, 10)) = 1
@@ -16,7 +20,12 @@ Shader "KIIF/Effect/Distort"
         
         _TwistSpeed("扭曲流动速度", Float) = 0
         _TwistMap("扭曲贴图(offset为流动方向)", 2D) = "white" {}
+        [Toggle] _TwistByCustomOn("启用自定义扭曲(UV0.w)", Float) = 0.0
         _TwistStrength("扭曲强度", Float) = 0
+        
+        [Toggle] _FlowMapEnabled("__flowmapenabled", Float) = 0.0
+        _FlowMap("FlowMap", 2D) = "white" {}
+        _FlowStrength("Flow(RG:Strength B:Speed)", Vector) = (0.1,0.1,0,0)
         
         _MaskMap("遮罩图", 2D) = "white" {}
         _MaskTwistStrength("遮罩图被扭曲的强度", Range(0 , 1)) = 0
@@ -26,11 +35,19 @@ Shader "KIIF/Effect/Distort"
         _DissolveMaskMap("溶解的遮罩贴图", 2D) = "black" {}
         _DissolveMaskSharpen("溶解遮罩渐变范围", Range(0.0, 0.5)) = 0
         _DissolveSpeed("溶解流动速度", Float) = 0
+        [Toggle] _DissolveByCustomOn("启用自定义溶解(UV0.z)", Float) = 0.0
         _Dissolve("溶解进度", Range(0.0, 1.0)) = 0
         _DissolveMap("溶解贴图", 2D) = "white" {}
         _DissolveSharpen("溶解硬度(最小值为1)", Range(1, 20)) = 1
         [HDR] _DissolveSideColor("溶解边缘颜色", Color) = (0,0,0,0)
         _DissolveSideWidth("溶解边缘宽度", Float) = 0
+        [HDR] _DissolveInsideColor("溶解内部颜色", Color) = (0,0,0,0)
+        _DissolveInsideWidth("溶解内部宽度", Float) = 0
+        
+        [Toggle] _VertexAnimEnabled("__vertexanimenabled", Float) = 0.0
+        _VertexMap("顶点动画贴图", 2D) = "white" {}
+        [Toggle] _VertexByCustomOn("启用自定义顶点动画(UV1.z)", Float) = 0.0
+        _VertexStrength("顶点位移强度", Float) = 0
         
         [Enum(Alpha,0,Add,1)] _Blend("__mode", Float) = 0.0
         [Enum(UnityEngine.Rendering.CullMode)] _Cull("__cull", Float) = 2.0
@@ -66,6 +83,8 @@ Shader "KIIF/Effect/Distort"
 
             // -------------------------------------
             // Material Keywords
+            #pragma shader_feature_local_fragment _FLOWMAP_ON
+            #pragma shader_feature_local_vertex _VERTEXANIM_ON
             // #pragma shader_feature_local _NORMALMAP
             // #pragma shader_feature_local_fragment _EMISSION
 
@@ -91,10 +110,12 @@ Shader "KIIF/Effect/Distort"
             #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/UnityInstancing.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/ParticlesInstancing.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/DeclareDepthTexture.hlsl"
+            #include "Assets/Art/Shaders/Library/KIIFCommon.hlsl"
 
             struct AttributesParticle
             {
                 float4 positionOS               : POSITION;
+                float3 normalOS                 : NORMAL;
                 half4 color                     : COLOR;
                 float4 texcoord0                : TEXCOORD0;
                 float4 texcoord1                : TEXCOORD1;
@@ -118,17 +139,23 @@ Shader "KIIF/Effect/Distort"
             };
 
             CBUFFER_START(UnityPerMaterial)
+            half _BaseUVByCustomOn;
             float4 _BaseMap_ST;
+            float4 _DetailMap_ST;
             float _Brighten;
             float _SelfMask;
             float2 _MainSpeed;
-            float _MainClampEnabled;
+            half _MainClampEnabled;
             float4 _MainClamp;
             half4 _BaseColor;
             half _Cutoff;
 
+            float4 _FlowMap_ST;
+            float4 _FlowStrength;
+
             float4 _TwistMap_ST;
             half _TwistSpeed;
+            half _TwistByCustomOn;
             half _TwistStrength;
 
             float4 _MaskMap_ST;
@@ -139,21 +166,31 @@ Shader "KIIF/Effect/Distort"
             float4 _DissolveMaskMap_ST;
             half _DissolveMaskSharpen;
             float4 _DissolveMap_ST;
+            half _DissolveByCustomOn;
             half _Dissolve;
             half _DissolveSpeed;
             half _DissolveSideWidth;
+            half _DissolveInsideWidth;
             half _DissolveSharpen;
             half4 _DissolveSideColor;
+            half4 _DissolveInsideColor;
+
+            float4 _VertexMap_ST;
+            half _VertexByCustomOn;
+            float  _VertexStrength;
             
             half _SoftParticle;
             half _MoveToCamera;
             CBUFFER_END
 
             TEXTURE2D(_BaseMap);            SAMPLER(sampler_BaseMap);
+            TEXTURE2D(_DetailMap);          SAMPLER(sampler_DetailMap);
             TEXTURE2D(_TwistMap);           SAMPLER(sampler_TwistMap);
+            TEXTURE2D(_FlowMap);            SAMPLER(sampler_FlowMap);
             TEXTURE2D(_MaskMap);            SAMPLER(sampler_MaskMap);
             TEXTURE2D(_DissolveMaskMap);    SAMPLER(sampler_DissolveMaskMap);
             TEXTURE2D(_DissolveMap);        SAMPLER(sampler_DissolveMap);
+            TEXTURE2D(_VertexMap);          SAMPLER(sampler_VertexMap);
 
             
             
@@ -164,11 +201,21 @@ Shader "KIIF/Effect/Distort"
                 UNITY_SETUP_INSTANCE_ID(input);
                 UNITY_TRANSFER_INSTANCE_ID(input, output);
                 UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(output);
+                
+                output.texcoord0 = input.texcoord0;
+                output.texcoord1 = input.texcoord1;
 
                 //顶点向摄像机方向偏移，以实现显示到其他物体前的效果
                 float3 cameraPositionOS = TransformWorldToObject(GetCameraPositionWS());
                 float3 offsetPositionOS = input.positionOS.xyz + normalize(cameraPositionOS - input.positionOS.xyz) * _MoveToCamera;
 
+                #ifdef _VERTEXANIM_ON
+                float2 vertexUV = input.texcoord0.xy * _VertexMap_ST.xy + _VertexMap_ST.zw * _Time.y;
+                float vertexMap = SAMPLE_TEXTURE2D_LOD(_VertexMap, sampler_VertexMap, vertexUV, 0).r;
+                float3 vertexOffsetOS =  input.normalOS * vertexMap * ((_VertexByCustomOn>0.5) ? input.texcoord1.z : _VertexStrength);
+                offsetPositionOS += vertexOffsetOS; 
+                #endif
+                
                 VertexPositionInputs vertexInput = GetVertexPositionInputs(offsetPositionOS);
 
                 output.clipPos = vertexInput.positionCS;
@@ -180,11 +227,6 @@ Shader "KIIF/Effect/Distort"
                 #endif
                 #endif
                 output.color = input.color;
-
-                // 多套贴图，在PS中变换UV
-                // output.texcoord = TRANSFORM_TEX(input.texcoord, _BaseMap);
-                output.texcoord0 = input.texcoord0;
-                output.texcoord1 = input.texcoord1;
 
                 output.positionWS = vertexInput.positionWS;
                 #if defined(_SOFTPARTICLES_ON) || defined(_FADING_ON) || defined(_DISTORTION_ON)
@@ -207,10 +249,14 @@ Shader "KIIF/Effect/Distort"
                 half2 twistUV = uv * _TwistMap_ST.xy + _TwistSpeed * _TwistMap_ST.zw * _Time.y;
                 half2 twist = SAMPLE_TEXTURE2D(_TwistMap, sampler_TwistMap, twistUV).rg;
                 // twist = (twist - 0.5) * 2;
-                twist *= _TwistStrength * input.texcoord0.w;
+                twist *= (_TwistByCustomOn>0.5f ? input.texcoord0.w : _TwistStrength);
+
+                // FlowMap
+                float2 flowUV = uv * _FlowMap_ST.xy + _Time.y * _FlowMap_ST.zw;
+                half2 flowDirection = SAMPLE_TEXTURE2D(_FlowMap, sampler_FlowMap, flowUV).xy;
 
                 // 基础功能
-                float2 baseUV = uv + input.texcoord1.xy;
+                float2 baseUV = uv + (_BaseUVByCustomOn>0.5f ? input.texcoord1.xy : 0);
                 baseUV += twist;                                            //把扭曲提前
                 const float2 baseUVTwisted = baseUV;
                 // half2 clampAlpha = step(_MainClamp.xy, baseUV.xy);      //UV硬切
@@ -221,9 +267,15 @@ Shader "KIIF/Effect/Distort"
                 // clampAlpha = lerp(1, clampAlpha, _MainClampEnabled);    //是否开启UV Clamp
                 baseUV = TRANSFORM_TEX(baseUV, _BaseMap);
                 baseUV += _Time.y * _MainSpeed.xy;
+                #ifdef _FLOWMAP_ON                
+                half4 color = Flow(TEXTURE2D_ARGS(_BaseMap, sampler_BaseMap), baseUV, flowDirection,
+                    _FlowStrength.xy, _FlowStrength.z);
+                #else
                 half4 color = SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, baseUV);
+                #endif
                 color.a *= lerp(1, color.r, _SelfMask);
-                color.rgb = pow(color.rgb, _Brighten) * _Brighten * _Brighten;  //提亮贴图的颜色
+                color.rgb = pow(abs(color.rgb), _Brighten) * _Brighten * _Brighten;  //提亮贴图的颜色
+                color.rgb += SAMPLE_TEXTURE2D(_DetailMap, sampler_DetailMap, TRANSFORM_TEX(uv, _DetailMap)).rgb;
                 color *= _BaseColor * vertexColor;
 
                 // color.a *= clampAlpha.x * clampAlpha.y;
@@ -238,7 +290,7 @@ Shader "KIIF/Effect/Distort"
                 half2 dissolveUV = uv * _DissolveMap_ST.xy + _DissolveSpeed * _DissolveMap_ST.zw * _Time.y + twist;
                 half dissolve = SAMPLE_TEXTURE2D(_DissolveMap, sampler_DissolveMap, dissolveUV).r;
 
-                half dissolveFactor = input.texcoord0.z + _Dissolve;
+                half dissolveFactor = (_DissolveByCustomOn>0.5f ? input.texcoord0.z : _Dissolve);
 
                 //溶解方案1
                 half dissolveMask_1 = lerp(0 - _DissolveMaskSharpen, 1 + _DissolveMaskSharpen, dissolveMask);
@@ -273,10 +325,16 @@ Shader "KIIF/Effect/Distort"
                 // half dissolveSide = 1 - saturate(_DissolveSideWidth - dissolve)/_DissolveSideWidth - step(_DissolveSideWidth, dissolve);
                 dissolve = (dissolve - 0.5) * _DissolveSharpen + 0.5;           //溶解边缘锐化
                 dissolve = lerp(dissolve, step(0.5, dissolve), step(19.9, _DissolveSharpen));   //硬度过大直接硬溶解
-                dissolve = saturate(dissolve);
+                // dissolve = clamp(dissolve, 0, 2);
+
+                // color.rgb = clamp(dissolve - _DissolveInsideWidth,0,100);
+                // color.a = 1;
+                // return color;
+                half dissolveInside = smoothstep(dissolve, dissolve - 1 / _DissolveInsideWidth, 1);
 
                 half3 dissolveSideColor = dissolveSide * _DissolveSideColor.rgb;
-                color.a *= dissolve;
+                color.a *= saturate(dissolve);
+                color.rgb = lerp(color.rgb, _DissolveInsideColor.rgb, dissolveInside);
                 color.rgb += dissolveSideColor;
 
                 // 遮罩

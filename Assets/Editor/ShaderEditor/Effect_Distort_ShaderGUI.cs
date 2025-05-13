@@ -10,8 +10,10 @@ public class Effect_Distort_ShaderGUI : ShaderGUI
     private static bool _Base_Foldout = false;
     private static bool _Color_Foldout = true;
     private static bool _Twist_Foldout = false;
+    private static bool _Flow_Foldout = false;
     private static bool _Mask_Foldout = false;
     private static bool _Dissolve_Foldout = false;
+    private static bool _VertexAnim_Foldout = false;
     
     MaterialEditor m_MaterialEditor;
     
@@ -23,6 +25,7 @@ public class Effect_Distort_ShaderGUI : ShaderGUI
     MaterialProperty BaseColor = null;
     MaterialProperty Brighten = null;
     MaterialProperty SelfMask = null;
+    MaterialProperty BaseUVByCustomOn = null;
     MaterialProperty BaseMap = null;
     MaterialProperty MainSpeed = null;
     MaterialProperty MainClampEnabled = null;
@@ -31,10 +34,16 @@ public class Effect_Distort_ShaderGUI : ShaderGUI
     MaterialProperty SoftParticlesEnabled = null;
     MaterialProperty SoftParticle = null;
     MaterialProperty MoveToCamera = null;
+    MaterialProperty DetailMap = null;
     //扭曲
     MaterialProperty TwistSpeed = null;
     MaterialProperty TwistMap = null;
+    MaterialProperty TwistByCustomOn = null;
     MaterialProperty TwistStrength = null;
+    //FlowMap
+    MaterialProperty FlowMapEnabled = null;
+    MaterialProperty FlowMap = null;
+    MaterialProperty FlowStrength = null;
     //遮罩
     MaterialProperty MaskMap = null;
     MaterialProperty MaskTwistStrength = null;
@@ -44,11 +53,21 @@ public class Effect_Distort_ShaderGUI : ShaderGUI
     MaterialProperty DissolveMaskMap = null;
     MaterialProperty DissolveMaskSharpen = null;
     MaterialProperty DissolveSpeed = null;
+    MaterialProperty DissolveByCustomOn = null;
     MaterialProperty Dissolve = null;
     MaterialProperty DissolveMap = null;
     MaterialProperty DissolveSharpen = null;
     MaterialProperty DissolveSideColor = null;
     MaterialProperty DissolveSideWidth = null;
+    MaterialProperty DissolveInsideColor = null;
+    MaterialProperty DissolveInsideWidth = null;
+    //顶点动画
+    MaterialProperty VertexAnimEnabled = null;
+    MaterialProperty VertexMap = null;
+    MaterialProperty VertexByCustomOn = null;
+    MaterialProperty VertexStrength = null;
+
+    private bool FlowStrengthSyncRG = true;
     
     static bool Foldout(bool display, string title)
     {
@@ -92,6 +111,7 @@ public class Effect_Distort_ShaderGUI : ShaderGUI
         BaseColor = FindProperty("_BaseColor", props);
         Brighten = FindProperty("_Brighten", props);
         SelfMask = FindProperty("_SelfMask", props);
+        BaseUVByCustomOn = FindProperty("_BaseUVByCustomOn", props);
         BaseMap = FindProperty("_BaseMap", props);
         MainSpeed = FindProperty("_MainSpeed", props);
         MainClampEnabled = FindProperty("_MainClampEnabled", props);
@@ -100,9 +120,15 @@ public class Effect_Distort_ShaderGUI : ShaderGUI
         SoftParticlesEnabled = FindProperty("_SoftParticlesEnabled", props);
         SoftParticle = FindProperty("_SoftParticle", props);
         MoveToCamera = FindProperty("_MoveToCamera", props);
+        DetailMap = FindProperty("_DetailMap", props);
+        
+        FlowMapEnabled = FindProperty("_FlowMapEnabled", props);
+        FlowMap = FindProperty("_FlowMap", props);
+        FlowStrength = FindProperty("_FlowStrength", props);
         
         TwistSpeed = FindProperty("_TwistSpeed", props);
         TwistMap = FindProperty("_TwistMap", props);
+        TwistByCustomOn = FindProperty("_TwistByCustomOn", props);
         TwistStrength = FindProperty("_TwistStrength", props);
         
         MaskMap = FindProperty("_MaskMap", props);
@@ -113,11 +139,19 @@ public class Effect_Distort_ShaderGUI : ShaderGUI
         DissolveMaskMap = FindProperty("_DissolveMaskMap", props);
         DissolveMaskSharpen = FindProperty("_DissolveMaskSharpen", props);
         DissolveSpeed = FindProperty("_DissolveSpeed", props);
+        DissolveByCustomOn = FindProperty("_DissolveByCustomOn", props);
         Dissolve = FindProperty("_Dissolve", props);
         DissolveMap = FindProperty("_DissolveMap", props);
         DissolveSharpen = FindProperty("_DissolveSharpen", props);
         DissolveSideColor = FindProperty("_DissolveSideColor", props);
         DissolveSideWidth = FindProperty("_DissolveSideWidth", props);
+        DissolveInsideColor = FindProperty("_DissolveInsideColor", props);
+        DissolveInsideWidth = FindProperty("_DissolveInsideWidth", props);
+        
+        VertexAnimEnabled = FindProperty("_VertexAnimEnabled", props);
+        VertexMap = FindProperty("_VertexMap", props);
+        VertexByCustomOn  = FindProperty("_VertexByCustomOn", props);
+        VertexStrength = FindProperty("_VertexStrength", props);
     }
     
     public override void OnGUI(MaterialEditor materialEditor, MaterialProperty[] props)
@@ -172,10 +206,12 @@ public class Effect_Distort_ShaderGUI : ShaderGUI
             m_MaterialEditor.ShaderProperty(BaseColor, "颜色");
             m_MaterialEditor.ShaderProperty(Brighten, "提亮");
             m_MaterialEditor.ShaderProperty(SelfMask, "自我遮罩(R通道作为A通道)");
+            m_MaterialEditor.ShaderProperty(BaseUVByCustomOn, "启用自定义UV(UV1.xy)");
             m_MaterialEditor.ShaderProperty(BaseMap, "颜色贴图");
             m_MaterialEditor.ShaderProperty(MainSpeed, "主贴图流动速度");
             m_MaterialEditor.ShaderProperty(MainClampEnabled, "开启贴图Clamp");
             m_MaterialEditor.ShaderProperty(MainClamp, "主贴图Clamp");
+            m_MaterialEditor.ShaderProperty(DetailMap, "细节贴图");
             m_MaterialEditor.ShaderProperty(Cutoff, "透明度裁切");
             m_MaterialEditor.ShaderProperty(SoftParticlesEnabled, "开启软粒子");
             if (material.GetFloat("_SoftParticlesEnabled") == 1)
@@ -200,7 +236,70 @@ public class Effect_Distort_ShaderGUI : ShaderGUI
         {
             m_MaterialEditor.ShaderProperty(TwistSpeed, "扭曲流动速度");
             m_MaterialEditor.ShaderProperty(TwistMap, "扭曲贴图(offset为流动方向)");
+            m_MaterialEditor.ShaderProperty(TwistByCustomOn, "启用自定义扭曲(UV0.w)");
             m_MaterialEditor.ShaderProperty(TwistStrength, "扭曲强度");
+        }
+        EditorGUILayout.EndVertical();
+        
+        //--------------------------------------
+        //FlowMap
+        EditorGUILayout.BeginVertical(EditorStyles.helpBox);
+        _Flow_Foldout = Foldout(_Flow_Foldout, "FlowMap");
+        if (_Flow_Foldout)
+        {
+            m_MaterialEditor.ShaderProperty(FlowMapEnabled, "开启FlowMap");
+            if (material.GetFloat("_FlowMapEnabled") == 1)
+            {
+                CoreUtils.SetKeyword(material, "_FLOWMAP_ON", true);
+                
+                m_MaterialEditor.ShaderProperty(FlowMap, "Flow贴图(offset为流动方向)");
+                // FlowStrengthSyncRG = EditorGUILayout.Toggle("FlowStrength单通道", FlowStrengthSyncRG);
+                // FlowStrengthSyncRG开关后立即生效
+                Vector4 FlowStrengthPrev = FlowStrength.vectorValue;
+                Vector4 FlowStrengthCurrent = FlowStrengthPrev;
+                bool newSyncRG = EditorGUILayout.Toggle("FlowStrength单通道G", FlowStrengthSyncRG);
+                if (newSyncRG != FlowStrengthSyncRG)
+                {
+                    FlowStrengthSyncRG = newSyncRG;
+                    if (FlowStrengthSyncRG)
+                    {
+                        // 切换为同步时立即强制同步 R=G
+                        FlowStrengthCurrent.y = FlowStrengthCurrent.x;
+                        FlowStrength.vectorValue = FlowStrengthCurrent;
+                    }
+                }
+                // m_MaterialEditor.ShaderProperty(FlowStrength, "Flow(RG:Strength B:Speed)");
+                // FlowStrength双通道或者单通道
+                EditorGUI.BeginChangeCheck();
+                
+                if (FlowStrengthSyncRG)
+                {
+                    float rgValue = EditorGUILayout.FloatField("Flow 强度 (R=G)", FlowStrengthPrev.x);
+                    float bValue = EditorGUILayout.FloatField("Flow 速度 (B)", FlowStrengthPrev.z);
+
+                    FlowStrengthCurrent.x = rgValue;
+                    FlowStrengthCurrent.y = rgValue;
+                    FlowStrengthCurrent.z = bValue;
+                }
+                else
+                {
+                    Vector2 rg = EditorGUILayout.Vector2Field("Flow 强度 (RG)", new Vector2(FlowStrengthPrev.x, FlowStrengthPrev.y));
+                    float bValue = EditorGUILayout.FloatField("Flow 速度 (B)", FlowStrengthPrev.z);
+
+                    FlowStrengthCurrent.x = rg.x;
+                    FlowStrengthCurrent.y = rg.y;
+                    FlowStrengthCurrent.z = bValue;
+                }
+                if (EditorGUI.EndChangeCheck())
+                {
+                    FlowStrength.vectorValue = FlowStrengthCurrent;
+                }
+                
+            }
+            else
+            {
+                CoreUtils.SetKeyword(material, "_FLOWMAP_ON", false);
+            }
         }
         EditorGUILayout.EndVertical();
         
@@ -226,11 +325,36 @@ public class Effect_Distort_ShaderGUI : ShaderGUI
             m_MaterialEditor.ShaderProperty(DissolveMaskMap, "溶解的遮罩贴图");
             m_MaterialEditor.ShaderProperty(DissolveMaskSharpen, "溶解遮罩渐变范围");
             m_MaterialEditor.ShaderProperty(DissolveSpeed, "溶解流动速度");
+            m_MaterialEditor.ShaderProperty(DissolveByCustomOn, "启用自定义溶解(UV0.z)");
             m_MaterialEditor.ShaderProperty(Dissolve, "溶解进度");
             m_MaterialEditor.ShaderProperty(DissolveMap, "溶解贴图");
             m_MaterialEditor.ShaderProperty(DissolveSharpen, "溶解硬度");
             m_MaterialEditor.ShaderProperty(DissolveSideColor, "溶解边缘颜色");
             m_MaterialEditor.ShaderProperty(DissolveSideWidth, "溶解边缘宽度(溶解较硬需要0.5以上)");
+            m_MaterialEditor.ShaderProperty(DissolveInsideColor, "溶解内部颜色");
+            m_MaterialEditor.ShaderProperty(DissolveInsideWidth, "溶解内部宽度");
+        }
+        EditorGUILayout.EndVertical();
+        
+        //--------------------------------------
+        //顶点动画
+        EditorGUILayout.BeginVertical(EditorStyles.helpBox);
+        _VertexAnim_Foldout = Foldout(_VertexAnim_Foldout, "顶点动画");
+        if (_VertexAnim_Foldout)
+        {
+            CoreUtils.SetKeyword(material, "_VERTEXANIM_ON", true);
+            
+            m_MaterialEditor.ShaderProperty(VertexAnimEnabled, "开启顶点动画");
+            if (material.GetFloat("_VertexAnimEnabled") == 1)
+            {
+                m_MaterialEditor.ShaderProperty(VertexMap, "开启顶点动画");
+                m_MaterialEditor.ShaderProperty(VertexByCustomOn, "启用自定义顶点动画(UV1.z)");
+                m_MaterialEditor.ShaderProperty(VertexStrength, "顶点位移强度");
+            }
+            else
+            {
+                CoreUtils.SetKeyword(material, "_VERTEXANIM_ON", false);
+            }
         }
         EditorGUILayout.EndVertical();
         

@@ -250,8 +250,9 @@ inline half3 GetGIColor(Varyings input, Light mainLight, BRDFData brdfData, PBRD
     #else
     half3 bakedGI = SAMPLE_GI(input.lightmapUV, input.vertexSH, pbrData.normalWS);
     #endif
-    // #if defined(LIGHTMAP_ON) && defined(_MIXED_LIGHTING_SUBTRACTIVE)
-    // bakedGI = SubtractDirectMainLightFromLightmap(mainLight, pbrData.normalWS, bakedGI);    //MixRealtimeAndBakedGI
+    #if defined(LIGHTMAP_ON) && defined(_MIXED_LIGHTING_SUBTRACTIVE)
+    bakedGI = SubtractDirectMainLightFromLightmap(mainLight, pbrData.normalWS, bakedGI);    //MixRealtimeAndBakedGI
+    #endif
 
     half3 GIcolor = GlobalIllumination(brdfData, bakedGI, pbrData.occlusion, pbrData.normalWS, pbrData.viewDirectionWS);
 
