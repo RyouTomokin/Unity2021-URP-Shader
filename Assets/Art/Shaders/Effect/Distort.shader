@@ -11,7 +11,7 @@ Shader "KIIF/Effect/Distort"
         [Toggle] _MainClampEnabled("__mainclamp", Float) = 0.0
         _MainClamp("主贴图Clamp", Vector) = (0,0,1,1)
         
-        _DetailMap("细节纹理", 2D) = "black" {}
+        _DetailMap("细节纹理", 2D) = "white" {}
         
         _Cutoff("Alpha Cutoff", Range(0.0, 1.0)) = 0
         [Toggle] _SoftParticlesEnabled("__softparticlesenabled", Float) = 0.0
@@ -21,6 +21,7 @@ Shader "KIIF/Effect/Distort"
         _TwistSpeed("扭曲流动速度", Float) = 0
         _TwistMap("扭曲贴图(offset为流动方向)", 2D) = "white" {}
         [Toggle] _TwistByCustomOn("启用自定义扭曲(UV0.w)", Float) = 0.0
+        [Enum(Twist,0,Flow,1)] _TwistMode("__twistmode", Float) = 0.0
         _TwistStrength("扭曲强度", Float) = 0
         
         [Toggle] _FlowMapEnabled("__flowmapenabled", Float) = 0.0
@@ -155,6 +156,7 @@ Shader "KIIF/Effect/Distort"
 
             float4 _TwistMap_ST;
             half _TwistSpeed;
+            half _TwistMode;
             half _TwistByCustomOn;
             half _TwistStrength;
 
@@ -249,15 +251,22 @@ Shader "KIIF/Effect/Distort"
                 half2 twistUV = uv * _TwistMap_ST.xy + _TwistSpeed * _TwistMap_ST.zw * _Time.y;
                 half2 twist = SAMPLE_TEXTURE2D(_TwistMap, sampler_TwistMap, twistUV).rg;
                 // twist = (twist - 0.5) * 2;
-                twist *= (_TwistByCustomOn>0.5f ? input.texcoord0.w : _TwistStrength);
+                // twist *= (_TwistByCustomOn>0.5f ? input.texcoord0.w : _TwistStrength);
+                float twistFact = (_TwistByCustomOn>0.5f ? input.texcoord0.w : _TwistStrength);
 
                 // FlowMap
+                #ifdef _FLOWMAP_ON   
                 float2 flowUV = uv * _FlowMap_ST.xy + _Time.y * _FlowMap_ST.zw;
                 half2 flowDirection = SAMPLE_TEXTURE2D(_FlowMap, sampler_FlowMap, flowUV).xy;
+                #endif
 
                 // 基础功能
                 float2 baseUV = uv + (_BaseUVByCustomOn>0.5f ? input.texcoord1.xy : 0);
-                baseUV += twist;                                            //把扭曲提前
+                // baseUV += twist;                                            //把扭曲提前
+                // baseUV = _TwistMode ? lerp(baseUV, twist, twistFact) : baseUV + twist * twistFact;
+                baseUV = lerp(baseUV, twist, twistFact) * _TwistMode +
+                    (baseUV + twist * twistFact) * (1 - _TwistMode);            // _TwistMode为0或1
+                
                 const float2 baseUVTwisted = baseUV;
                 // half2 clampAlpha = step(_MainClamp.xy, baseUV.xy);      //UV硬切
                 // clampAlpha *= step(baseUV.xy, _MainClamp.zw);
@@ -275,19 +284,27 @@ Shader "KIIF/Effect/Distort"
                 #endif
                 color.a *= lerp(1, color.r, _SelfMask);
                 color.rgb = pow(abs(color.rgb), _Brighten) * _Brighten * _Brighten;  //提亮贴图的颜色
-                color.rgb += SAMPLE_TEXTURE2D(_DetailMap, sampler_DetailMap, TRANSFORM_TEX(uv, _DetailMap)).rgb;
+                color.rgb *= SAMPLE_TEXTURE2D(_DetailMap, sampler_DetailMap, TRANSFORM_TEX(uv, _DetailMap)).rgb;
                 color *= _BaseColor * vertexColor;
 
                 // color.a *= clampAlpha.x * clampAlpha.y;
                 clip(color.a - _Cutoff);
 
                 // 溶解
-                half2 dissolveMaskUV = TRANSFORM_TEX(uv, _DissolveMaskMap) + twist;
+                half2 dissolveMaskUV = TRANSFORM_TEX(uv, _DissolveMaskMap);
+                // dissolveMaskUV = _TwistMode ? lerp(dissolveMaskUV, twist, twistFact) : dissolveMaskUV + twist * twistFact;
+                dissolveMaskUV = lerp(dissolveMaskUV, twist, twistFact) * _TwistMode +
+                    (dissolveMaskUV + twist * twistFact) * (1 - _TwistMode);        // _TwistMode为0或1
                 half dissolveMask = SAMPLE_TEXTURE2D(_DissolveMaskMap, sampler_DissolveMaskMap, dissolveMaskUV).r;
 
                 // dissolveMask = saturate((dissolveMask - 0.5) * dissolveMaskSoft + dissolveMaskRange);
 
-                half2 dissolveUV = uv * _DissolveMap_ST.xy + _DissolveSpeed * _DissolveMap_ST.zw * _Time.y + twist;
+                // half2 dissolveUV = uv * _DissolveMap_ST.xy + _DissolveSpeed * _DissolveMap_ST.zw * _Time.y + twist;  // 旧版扭曲
+                half2 dissolveUV = uv * _DissolveMap_ST.xy;
+                // dissolveUV = _TwistMode ? lerp(dissolveUV, twist, twistFact) : dissolveUV + twist * twistFact;
+                dissolveUV = lerp(dissolveUV, twist, twistFact) * _TwistMode +
+                    (dissolveUV + twist * twistFact) * (1 - _TwistMode);        // _TwistMode为0或1
+                dissolveUV += _DissolveSpeed * _DissolveMap_ST.zw * _Time.y;    // 使流动作用于扭曲之后
                 half dissolve = SAMPLE_TEXTURE2D(_DissolveMap, sampler_DissolveMap, dissolveUV).r;
 
                 half dissolveFactor = (_DissolveByCustomOn>0.5f ? input.texcoord0.z : _Dissolve);

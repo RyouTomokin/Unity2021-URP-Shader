@@ -38,6 +38,7 @@ public class Effect_Distort_ShaderGUI : ShaderGUI
     //扭曲
     MaterialProperty TwistSpeed = null;
     MaterialProperty TwistMap = null;
+    MaterialProperty TwistMode = null;
     MaterialProperty TwistByCustomOn = null;
     MaterialProperty TwistStrength = null;
     //FlowMap
@@ -128,6 +129,7 @@ public class Effect_Distort_ShaderGUI : ShaderGUI
         
         TwistSpeed = FindProperty("_TwistSpeed", props);
         TwistMap = FindProperty("_TwistMap", props);
+        TwistMode = FindProperty("_TwistMode", props);
         TwistByCustomOn = FindProperty("_TwistByCustomOn", props);
         TwistStrength = FindProperty("_TwistStrength", props);
         
@@ -236,6 +238,7 @@ public class Effect_Distort_ShaderGUI : ShaderGUI
         {
             m_MaterialEditor.ShaderProperty(TwistSpeed, "扭曲流动速度");
             m_MaterialEditor.ShaderProperty(TwistMap, "扭曲贴图(offset为流动方向)");
+            m_MaterialEditor.ShaderProperty(TwistMode, "扭曲模式");
             m_MaterialEditor.ShaderProperty(TwistByCustomOn, "启用自定义扭曲(UV0.w)");
             m_MaterialEditor.ShaderProperty(TwistStrength, "扭曲强度");
         }
