@@ -50,6 +50,7 @@ public class Effect_Distort_ShaderGUI : ShaderGUI
     MaterialProperty MaskTwistStrength = null;
     MaterialProperty MaskSoft = null;
     //溶解
+    MaterialProperty DissolveEnabled = null;
     MaterialProperty DissolveMode = null;
     MaterialProperty DissolveMaskMap = null;
     MaterialProperty DissolveMaskSharpen = null;
@@ -62,6 +63,7 @@ public class Effect_Distort_ShaderGUI : ShaderGUI
     MaterialProperty DissolveSideWidth = null;
     MaterialProperty DissolveInsideColor = null;
     MaterialProperty DissolveInsideWidth = null;
+    MaterialProperty DissolveInsideSoft = null;
     //顶点动画
     MaterialProperty VertexAnimEnabled = null;
     MaterialProperty VertexMap = null;
@@ -137,6 +139,7 @@ public class Effect_Distort_ShaderGUI : ShaderGUI
         MaskTwistStrength = FindProperty("_MaskTwistStrength", props);
         MaskSoft = FindProperty("_MaskSoft", props);
         
+        DissolveEnabled = FindProperty("_DissolveEnabled", props);
         DissolveMode = FindProperty("_DissolveMode", props);
         DissolveMaskMap = FindProperty("_DissolveMaskMap", props);
         DissolveMaskSharpen = FindProperty("_DissolveMaskSharpen", props);
@@ -149,6 +152,7 @@ public class Effect_Distort_ShaderGUI : ShaderGUI
         DissolveSideWidth = FindProperty("_DissolveSideWidth", props);
         DissolveInsideColor = FindProperty("_DissolveInsideColor", props);
         DissolveInsideWidth = FindProperty("_DissolveInsideWidth", props);
+        DissolveInsideSoft = FindProperty("_DissolveInsideSoft", props);
         
         VertexAnimEnabled = FindProperty("_VertexAnimEnabled", props);
         VertexMap = FindProperty("_VertexMap", props);
@@ -324,18 +328,28 @@ public class Effect_Distort_ShaderGUI : ShaderGUI
         _Dissolve_Foldout = Foldout(_Dissolve_Foldout, "溶解");
         if (_Dissolve_Foldout)
         {
-            m_MaterialEditor.ShaderProperty(DissolveMode, "轴向溶解模式");
-            m_MaterialEditor.ShaderProperty(DissolveMaskMap, "溶解的遮罩贴图");
-            m_MaterialEditor.ShaderProperty(DissolveMaskSharpen, "溶解遮罩渐变范围");
-            m_MaterialEditor.ShaderProperty(DissolveSpeed, "溶解流动速度");
-            m_MaterialEditor.ShaderProperty(DissolveByCustomOn, "启用自定义溶解(UV0.z)");
-            m_MaterialEditor.ShaderProperty(Dissolve, "溶解进度");
-            m_MaterialEditor.ShaderProperty(DissolveMap, "溶解贴图");
-            m_MaterialEditor.ShaderProperty(DissolveSharpen, "溶解硬度");
-            m_MaterialEditor.ShaderProperty(DissolveSideColor, "溶解边缘颜色");
-            m_MaterialEditor.ShaderProperty(DissolveSideWidth, "溶解边缘宽度(溶解较硬需要0.5以上)");
-            m_MaterialEditor.ShaderProperty(DissolveInsideColor, "溶解内部颜色");
-            m_MaterialEditor.ShaderProperty(DissolveInsideWidth, "溶解内部宽度");
+            m_MaterialEditor.ShaderProperty(DissolveEnabled, "开启溶解");
+            if (material.GetFloat("_DissolveEnabled") == 1)
+            {
+                CoreUtils.SetKeyword(material, "_DISSOLVE_ON", true);
+                m_MaterialEditor.ShaderProperty(DissolveMode, "轴向溶解模式");
+                m_MaterialEditor.ShaderProperty(DissolveMaskMap, "溶解的遮罩贴图");
+                m_MaterialEditor.ShaderProperty(DissolveMaskSharpen, "溶解遮罩渐变范围");
+                m_MaterialEditor.ShaderProperty(DissolveSpeed, "溶解流动速度");
+                m_MaterialEditor.ShaderProperty(DissolveByCustomOn, "启用自定义溶解(UV0.z)");
+                m_MaterialEditor.ShaderProperty(Dissolve, "溶解进度");
+                m_MaterialEditor.ShaderProperty(DissolveMap, "溶解贴图");
+                m_MaterialEditor.ShaderProperty(DissolveSharpen, "溶解硬度");
+                m_MaterialEditor.ShaderProperty(DissolveSideColor, "溶解边缘颜色");
+                m_MaterialEditor.ShaderProperty(DissolveSideWidth, "溶解边缘宽度(溶解较硬需要0.5以上)");
+                m_MaterialEditor.ShaderProperty(DissolveInsideColor, "溶解内部颜色");
+                m_MaterialEditor.ShaderProperty(DissolveInsideWidth, "溶解内部范围");
+                m_MaterialEditor.ShaderProperty(DissolveInsideSoft, "溶解内部硬度");
+            }
+            else
+            {
+                CoreUtils.SetKeyword(material, "_DISSOLVE_ON", false);
+            }
         }
         EditorGUILayout.EndVertical();
         

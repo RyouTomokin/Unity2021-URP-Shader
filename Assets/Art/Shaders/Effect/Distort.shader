@@ -5,7 +5,7 @@ Shader "KIIF/Effect/Distort"
         [MainColor][HDR] _BaseColor("Color", Color) = (1,1,1,1)
         _Brighten("提亮", Range(0, 5)) = 1
         [Toggle] _SelfMask("自我遮罩", Float) = 0
-        [Toggle] _BaseUVByCustomOn("启用自定义UV(UV1.xy)", Float) = 0.0
+        [Toggle] _BaseUVByCustomOn("启用自定义UV(UV1.xy)", Float) = 1.0
         [MainTexture] _BaseMap("Albedo", 2D) = "white" {}
         _MainSpeed("主贴图流动速度", Vector) = (0,0,0,0)
         [Toggle] _MainClampEnabled("__mainclamp", Float) = 0.0
@@ -20,8 +20,8 @@ Shader "KIIF/Effect/Distort"
         
         _TwistSpeed("扭曲流动速度", Float) = 0
         _TwistMap("扭曲贴图(offset为流动方向)", 2D) = "white" {}
-        [Toggle] _TwistByCustomOn("启用自定义扭曲(UV0.w)", Float) = 0.0
         [Enum(Twist,0,Flow,1)] _TwistMode("__twistmode", Float) = 0.0
+        [Toggle] _TwistByCustomOn("启用自定义扭曲(UV0.w)", Float) = 1.0
         _TwistStrength("扭曲强度", Float) = 0
         
         [Toggle] _FlowMapEnabled("__flowmapenabled", Float) = 0.0
@@ -32,18 +32,20 @@ Shader "KIIF/Effect/Distort"
         _MaskTwistStrength("遮罩图被扭曲的强度", Range(0 , 1)) = 0
         _MaskSoft("遮罩图软硬", Range( 1 , 10)) = 1
         
+        [Toggle] _DissolveEnabled("_dissolveenabled", Float) = 1.0
         _DissolveMode("轴向溶解模式", Range(0, 1)) = 0
         _DissolveMaskMap("溶解的遮罩贴图", 2D) = "black" {}
         _DissolveMaskSharpen("溶解遮罩渐变范围", Range(0.0, 0.5)) = 0
         _DissolveSpeed("溶解流动速度", Float) = 0
-        [Toggle] _DissolveByCustomOn("启用自定义溶解(UV0.z)", Float) = 0.0
+        [Toggle] _DissolveByCustomOn("启用自定义溶解(UV0.z)", Float) = 1.0
         _Dissolve("溶解进度", Range(0.0, 1.0)) = 0
         _DissolveMap("溶解贴图", 2D) = "white" {}
         _DissolveSharpen("溶解硬度(最小值为1)", Range(1, 20)) = 1
         [HDR] _DissolveSideColor("溶解边缘颜色", Color) = (0,0,0,0)
         _DissolveSideWidth("溶解边缘宽度", Float) = 0
         [HDR] _DissolveInsideColor("溶解内部颜色", Color) = (0,0,0,0)
-        _DissolveInsideWidth("溶解内部宽度", Float) = 0
+        _DissolveInsideWidth("溶解内部范围", Float) = 0
+        _DissolveInsideSoft("溶解内部硬度", Float) = 1
         
         [Toggle] _VertexAnimEnabled("__vertexanimenabled", Float) = 0.0
         _VertexMap("顶点动画贴图", 2D) = "white" {}
@@ -85,6 +87,7 @@ Shader "KIIF/Effect/Distort"
             // -------------------------------------
             // Material Keywords
             #pragma shader_feature_local_fragment _FLOWMAP_ON
+            #pragma shader_feature_local_fragment _DISSOLVE_ON
             #pragma shader_feature_local_vertex _VERTEXANIM_ON
             // #pragma shader_feature_local _NORMALMAP
             // #pragma shader_feature_local_fragment _EMISSION
@@ -176,6 +179,7 @@ Shader "KIIF/Effect/Distort"
             half _DissolveSharpen;
             half4 _DissolveSideColor;
             half4 _DissolveInsideColor;
+            half _DissolveInsideSoft;
 
             float4 _VertexMap_ST;
             half _VertexByCustomOn;
@@ -347,11 +351,11 @@ Shader "KIIF/Effect/Distort"
                 // color.rgb = clamp(dissolve - _DissolveInsideWidth,0,100);
                 // color.a = 1;
                 // return color;
-                half dissolveInside = smoothstep(dissolve, dissolve - 1 / _DissolveInsideWidth, 1);
+                half dissolveInside = smoothstep(dissolve - _DissolveInsideWidth, dissolve - _DissolveInsideWidth - 1 / _DissolveInsideSoft, 1);
 
                 half3 dissolveSideColor = dissolveSide * _DissolveSideColor.rgb;
                 color.a *= saturate(dissolve);
-                color.rgb = lerp(color.rgb, _DissolveInsideColor.rgb, dissolveInside);
+                color.rgb = lerp(color.rgb, _DissolveInsideColor.rgb * vertexColor.rgb, dissolveInside);
                 color.rgb += dissolveSideColor;
 
                 // 遮罩
