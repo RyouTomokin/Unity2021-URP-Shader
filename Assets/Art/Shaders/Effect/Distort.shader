@@ -41,11 +41,11 @@ Shader "KIIF/Effect/Distort"
         _Dissolve("溶解进度", Range(0.0, 1.0)) = 0
         _DissolveMap("溶解贴图", 2D) = "white" {}
         _DissolveSharpen("溶解硬度(最小值为1)", Range(1, 20)) = 1
-        [HDR] _DissolveSideColor("溶解边缘颜色", Color) = (0,0,0,0)
+        [HDR] _DissolveSideColor("溶解边缘颜色", Color) = (0,0,0,1)
         _DissolveSideWidth("溶解边缘宽度", Float) = 0
-        [HDR] _DissolveInsideColor("溶解内部颜色", Color) = (0,0,0,0)
+        [HDR] _DissolveInsideColor("溶解内部颜色", Color) = (0,0,0,1)
         _DissolveInsideWidth("溶解内部范围", Float) = 0
-        _DissolveInsideSoft("溶解内部硬度", Float) = 1
+        _DissolveInsideSoft("溶解内部硬度", Float) = 0
         
         [Toggle] _VertexAnimEnabled("__vertexanimenabled", Float) = 0.0
         _VertexMap("顶点动画贴图", 2D) = "white" {}
@@ -56,8 +56,8 @@ Shader "KIIF/Effect/Distort"
         [Enum(UnityEngine.Rendering.CullMode)] _Cull("__cull", Float) = 2.0
         [Enum(Close,0,Open,1)] _DepthTest("深度测试", Float) = 1.0
 
-        [HideInInspector] _SrcBlend("__src", Float) = 1.0
-        [HideInInspector] _DstBlend("__dst", Float) = 0.0
+        [HideInInspector] _SrcBlend("__src", Float) = 5.0
+        [HideInInspector] _DstBlend("__dst", Float) = 10.0
         [HideInInspector] _ZTest("_ZTest", Float) = 0.0
         [HideInInspector] _ZWrite("__zw", Float) = 0.0
     }
