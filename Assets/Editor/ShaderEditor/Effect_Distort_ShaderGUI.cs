@@ -264,7 +264,7 @@ public class Effect_Distort_ShaderGUI : ShaderGUI
                 // FlowStrengthSyncRG开关后立即生效
                 Vector4 FlowStrengthPrev = FlowStrength.vectorValue;
                 Vector4 FlowStrengthCurrent = FlowStrengthPrev;
-                bool newSyncRG = EditorGUILayout.Toggle("FlowStrength单通道G", FlowStrengthSyncRG);
+                bool newSyncRG = EditorGUILayout.Toggle("FlowStrength单通道", FlowStrengthSyncRG);
                 if (newSyncRG != FlowStrengthSyncRG)
                 {
                     FlowStrengthSyncRG = newSyncRG;
@@ -364,7 +364,7 @@ public class Effect_Distort_ShaderGUI : ShaderGUI
             m_MaterialEditor.ShaderProperty(VertexAnimEnabled, "开启顶点动画");
             if (material.GetFloat("_VertexAnimEnabled") == 1)
             {
-                m_MaterialEditor.ShaderProperty(VertexMap, "开启顶点动画");
+                m_MaterialEditor.ShaderProperty(VertexMap, "顶点动画贴图");
                 m_MaterialEditor.ShaderProperty(VertexByCustomOn, "启用自定义顶点动画(UV1.z)");
                 m_MaterialEditor.ShaderProperty(VertexStrength, "顶点位移强度");
             }
