@@ -33,6 +33,10 @@ Material:
         m_Texture: {fileID: 2800000, guid: c79956e8fe1332b45a347144a2a0f137, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
+    - _EmissionMap:
+        m_Texture: {fileID: 2800000, guid: 853586030442ff74ea1fd30b7a0cd0dc, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
     - _HeightMap:
         m_Texture: {fileID: 2800000, guid: ecba86ca66e8fdd46937866243a44f45, type: 3}
         m_Scale: {x: 1, y: 1}
@@ -67,6 +71,7 @@ Material:
     - _ColorIntensity: 2
     - _Cull: 2
     - _Dissolve: 0
+    - _DissolveMaskSharpen: 0
     - _ParallaxScale: 0.08
     - _ParrallaxScale: 0.08
     - _Power: 1
@@ -80,7 +85,8 @@ Material:
     - _ZWrite: 0
     m_Colors:
     - _AddColor: {r: 1.8484939, g: 4.1077642, b: 9.807287, a: 1}
-    - _BaseColor: {r: 0.12266667, g: 0.14720002, b: 0.276, a: 1}
+    - _BaseColor: {r: 1, g: 1, b: 1, a: 1}
+    - _DarkColor: {r: 0.21698111, g: 0.21698111, b: 0.21698111, a: 1}
     - _EmissionColor: {r: 0.46670458, g: 1.009091, b: 2.4092047, a: 1}
     - _StreamColor: {r: 4.230716, g: 6.174888, b: 9.820204, a: 1}
     - _StreamTiling: {r: 1, g: 1, b: 0.1, a: 0.1}

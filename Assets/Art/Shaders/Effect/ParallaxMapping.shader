@@ -1,15 +1,17 @@
- Shader "KIIF/Effect/ParallaxMapping"
+Shader "KIIF/Effect/ParallaxMapping"
 {
     Properties
     {
-        [HideInInspector] _AlphaCutoff("Alpha Cutoff ", Range(0, 1)) = 0.5
 		_BaseColor("BaseColor", Color) = (1,1,1,1)
-		[HDR]_EmissionColor("EmissionColor", Color) = (0,0,0,1)
-		_ColorIntensity("ColorIntensity", Range( 0 , 10)) = 1
 		_BaseMap("BaseMap", 2D) = "white" {}
+		_ColorIntensity("ColorIntensity(Custom1.y)", Range( 0 , 10)) = 1
+		_DarkColor("DarkColor", Color) = (0,0,0,1)
+		[HDR]_EmissionColor("EmissionColor", Color) = (0,0,0,1)
+		[NoScaleOffset] _EmissionMap("EmissionMap", 2D) = "black" {}
 		_ParallaxScale("ParrallaxScale", Float) = 0
-		_HeightMap("HeightMap", 2D) = "white" {}
-		_Dissolve("Dissolve", Range(0, 1)) = 0
+		[NoScaleOffset] _HeightMap("HeightMap", 2D) = "white" {}
+		_Dissolve("Dissolve(Custom1.x)", Range(0, 1)) = 0
+        _DissolveMaskSharpen("DissolveMaskSharpen", Range(0.0, 0.5)) = 0
 //		[Toggle]_UseCustom1X("UseCustom1X", Float) = 0
 		_DissolveMap("DissolveMap", 2D) = "white" {}
 //		_StreamMap("StreamMap", 2D) = "white" {}
@@ -46,8 +48,8 @@
             }
 
             Blend SrcAlpha OneMinusSrcAlpha
-            ZTest Always
-            ZWrite [_ZWrite]
+//            ZTest Always
+            ZWrite off
             Cull [_Cull]
 
             HLSLPROGRAM
@@ -93,7 +95,7 @@
                 float4 positionCS               : SV_POSITION;
                 half4 color                     : COLOR;
                 float4 uv                       : TEXCOORD0;
-                float3 viewDirWS                : TEXCOORD2;
+                float3 positionWS               : TEXCOORD2;
                 float3 normalWS                 : TEXCOORD3;
                 float3 tangentWS                : TEXCOORD4;
                 float3 bitangentWS              : TEXCOORD5;
@@ -104,6 +106,7 @@
 
             CBUFFER_START(UnityPerMaterial)
             float4 _EmissionColor;
+            float4 _DarkColor;
 			float4 _BaseMap_ST;
 			float4 _HeightMap_ST;
 			float4 _DissolveMap_ST;
@@ -113,9 +116,11 @@
 			float _ParallaxScale;
 			float _ColorIntensity;
 			float _Dissolve;
+			float _DissolveMaskSharpen;
             CBUFFER_END
 
             TEXTURE2D(_BaseMap);                SAMPLER(sampler_BaseMap);
+            TEXTURE2D(_EmissionMap);            SAMPLER(sampler_EmissionMap);
             TEXTURE2D(_HeightMap);              SAMPLER(sampler_HeightMap);
             // TEXTURE2D(_StreamMap);              SAMPLER(sampler_StreamMap);
             TEXTURE2D(_DissolveMap);            SAMPLER(sampler_DissolveMap);
@@ -132,7 +137,7 @@
                 VertexPositionInputs vertexInput = GetVertexPositionInputs(input.positionOS.xyz);
                 VertexNormalInputs normalInput = GetVertexNormalInputs(input.normalOS, input.tangentOS);
 
-                output.viewDirWS = normalize(GetCameraPositionWS() - vertexInput.positionWS);
+                output.positionWS = vertexInput.positionWS;
                 output.normalWS = normalInput.normalWS;
                 output.tangentWS = normalInput.tangentWS;
                 output.bitangentWS = normalInput.bitangentWS;
@@ -147,6 +152,74 @@
                 return output;
             }
 
+            inline float2 POM( Texture2D heightMap, float2 uvs, float2 dx, float2 dy,
+            	float3 normalWorld, float3 viewWorld, float3 viewDirTan, int minSamples, int maxSamples,
+            	float parallax, float refPlane, float2 tilling, float2 curv, int index )
+			{
+				float3 result = 0;
+				int stepIndex = 0;
+				int numSteps = floor(lerp( (float)maxSamples, (float)minSamples, saturate( dot( normalWorld, viewWorld ) ) ));
+				float layerHeight = 1.0 / numSteps;
+				float2 plane = parallax * ( viewDirTan.xy / viewDirTan.z );
+				uvs.xy += refPlane * plane;
+				float2 deltaTex = -plane * layerHeight;
+				float2 prevTexOffset = 0;
+				float prevRayZ = 1.0f;
+				float prevHeight = 0.0f;
+				float2 currTexOffset = deltaTex;
+				float currRayZ = 1.0f - layerHeight;
+				float currHeight = 0.0f;
+				float intersection = 0;
+				float2 finalTexOffset = 0;
+				while ( stepIndex < numSteps + 1 )
+				{
+			 		// currHeight = tex2Dgrad( heightMap, uvs + currTexOffset, dx, dy ).r;
+					currHeight = SAMPLE_TEXTURE2D_GRAD(heightMap, sampler_HeightMap, uvs + currTexOffset, dx, dy).r;
+			 		if ( currHeight > currRayZ )
+			 		{
+			 	 		stepIndex = numSteps + 1;
+			 		}
+			 		else
+			 		{
+			 	 		stepIndex++;
+			 	 		prevTexOffset = currTexOffset;
+			 	 		prevRayZ = currRayZ;
+			 	 		prevHeight = currHeight;
+			 	 		currTexOffset += deltaTex;
+			 	 		currRayZ -= layerHeight;
+			 		}
+				}
+				int sectionSteps = 2;
+				int sectionIndex = 0;
+				float newZ = 0;
+				float newHeight = 0;
+				while ( sectionIndex < sectionSteps )
+				{
+			 		intersection = ( prevHeight - prevRayZ ) / ( prevHeight - currHeight + currRayZ - prevRayZ );
+			 		finalTexOffset = prevTexOffset + intersection * deltaTex;
+			 		newZ = prevRayZ - intersection * layerHeight;
+			 		// newHeight = tex2Dgrad( heightMap, uvs + finalTexOffset, dx, dy ).r;
+					newHeight = SAMPLE_TEXTURE2D_GRAD(heightMap, sampler_HeightMap, uvs + finalTexOffset, dx, dy).r;
+			 		if ( newHeight > newZ )
+			 		{
+			 	 		currTexOffset = finalTexOffset;
+			 	 		currHeight = newHeight;
+			 	 		currRayZ = newZ;
+			 	 		deltaTex = intersection * deltaTex;
+			 	 		layerHeight = intersection * layerHeight;
+			 		}
+			 		else
+			 		{
+			 	 		prevTexOffset = finalTexOffset;
+			 	 		prevHeight = newHeight;
+			 	 		prevRayZ = newZ;
+			 	 		deltaTex = ( 1 - intersection ) * deltaTex;
+			 	 		layerHeight = ( 1 - intersection ) * layerHeight;
+			 		}
+			 		sectionIndex++;
+				}
+				return uvs.xy + finalTexOffset;
+			}
 
             half4 frag_Unlit(VaryingsUnlit input) : SV_Target
             {
@@ -156,32 +229,53 @@
                 // -------------------------------------
 
                 float2 uv = input.uv.xy;
-                float2 heightUV = TRANSFORM_TEX(uv, _HeightMap);
+                float customDissolve = input.uv.z;
+                float customIntensity = input.uv.w;
+                // float2 heightUV = TRANSFORM_TEX(uv, _HeightMap);
                 float2 baseUV = TRANSFORM_TEX(uv, _BaseMap);
-                half height = SAMPLE_TEXTURE2D(_HeightMap, sampler_HeightMap, heightUV);
-                float3 viewDirWS = input.viewDirWS;
+                // half height = SAMPLE_TEXTURE2D(_HeightMap, sampler_HeightMap, heightUV);
+                float3 viewDirWS = GetWorldSpaceNormalizeViewDir(input.positionWS);
 
                 half3x3 TangentToWorld = half3x3(input.tangentWS.xyz, input.bitangentWS.xyz, input.normalWS.xyz);
                 float3 viewDirTS = TransformWorldToTangent(viewDirWS, TangentToWorld);
-                float2 Offset = (height - 1) * viewDirTS.xy * _ParallaxScale + baseUV;
+                float2 parallax_uv_offset = POM( _HeightMap, input.uv, ddx(input.uv), ddy(input.uv),
+					input.normalWS, viewDirWS, viewDirTS, 1, 8,
+					_ParallaxScale, 0, _HeightMap_ST.xy, float2(0,0), 0 );
+                // float2 Offset = (height - 1) * viewDirTS.xy * _ParallaxScale + baseUV;
 
-                // 计算Parallax UV
+                // 采样纹理颜色
                 // -------------------------------------
-                half baseAlpha = SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, baseUV).a;
-                float2 parallaxUV = Offset;
-                half3 baseColor = SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, parallaxUV).rgb;
+                half4 baseColor = SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, baseUV);
+                half baseAlpha = SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, uv).a;
+                baseColor.a = baseAlpha;
+                baseColor *= _BaseColor;
+
+                float2 parallaxUV = parallax_uv_offset;
+                half3 emissionColor = SAMPLE_TEXTURE2D(_EmissionMap, sampler_EmissionMap, parallaxUV).rgb;
+                half emissionAlpha = SAMPLE_TEXTURE2D(_EmissionMap, sampler_EmissionMap, uv).a;
+
+                float3 heightColor = lerp(0, _DarkColor, emissionColor);
+                baseColor.rgb = lerp(baseColor.rgb, heightColor, emissionAlpha);
+                baseColor.rgb += emissionColor * _EmissionColor * emissionAlpha * _ColorIntensity * customIntensity;
+                baseColor.a = lerp(baseColor.a, emissionAlpha, emissionAlpha);
 
                 // -------------------------------------
                 half2 dissolveUV = uv * _DissolveMap_ST.xy + _DissolveMap_ST.zw * _Time.y;
                 half2 dissolve = SAMPLE_TEXTURE2D(_DissolveMap, sampler_DissolveMap, dissolveUV).rg;    //dissolve和dissolveMask
-                half dissolveFactor = input.uv.z + _Dissolve;
-                dissolve = dissolve.r + (1 - dissolveFactor) * dissolve.g;
-                dissolve -= lerp(-1, 1, dissolveFactor);
-                dissolve = saturate(dissolve);
+                half dissolveFactor = customDissolve + _Dissolve;
+                half dissolveMask_1 = lerp(0 - _DissolveMaskSharpen, 1 + _DissolveMaskSharpen, dissolve.g);
+                dissolveMask_1 -= lerp(-1, 1, dissolveFactor);
+                dissolveMask_1 = (dissolveMask_1 - _DissolveMaskSharpen) / (1 - 2 * _DissolveMaskSharpen);
+                dissolveMask_1 = saturate(dissolveMask_1);
+
+                half dissolve_1 = lerp(0, 1, dissolve);
+                dissolve_1 += dissolveMask_1;
+                dissolve_1 *= dissolveMask_1;
 
                 // -------------------------------------
-                half3 color = (_EmissionColor.rgb * baseColor + _BaseColor.rgb) * input.color.rgb * _ColorIntensity;
-                half alpha = _BaseColor.a * input.color.a * baseAlpha * dissolve;
+                half3 color = baseColor.rgb * input.color.rgb;
+                half alpha = baseColor.a * dissolve_1 * input.color.a;
+                alpha = saturate(alpha);
 
                 return half4(color, alpha);
             }
