@@ -8,8 +8,8 @@
 
         [Toggle(_DITHER_ON)] _Dither("Dither Clipping", Float) = 0.0
 //        _DitherMap("Dither", 2D) = "white" {}
-        _NearDistance ("Near Distance", Float) = 15.0
-        _FarDistance ("Far Distance", Float) = 25.0
+        _NearDistance ("Near Distance", Float) = 13.0
+        _FarDistance ("Far Distance", Float) = 30.0
         _DitherScale ("DitherScale", Float) = 1.5
 
         _VirtualSunColor ("VirtualSunColor", Color) = (0, 0, 0, 0)
@@ -49,6 +49,7 @@
         HLSLINCLUDE
 
         #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+        #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
 
         CBUFFER_START(UnityPerMaterial)
         float4 _BaseMap_ST;
@@ -73,6 +74,13 @@
         float _Strength;
         CBUFFER_END
 
+        static const float4x4 threshold = float4x4(
+            0.0, 0.5333, 0.1333, 0.6667,
+            0.8, 0.2667, 0.9333, 0.4,
+            0.2, 0.7333, 0.0667, 0.6,
+            1.0, 0.4667, 0.8667, 0.3333
+            );
+
         // 风效
         inline float3 Wind(half3 position)
         {
@@ -91,6 +99,33 @@
             return position + float3(offsetX, offsetY, offsetZ);
         }
 
+        inline void Dither(float3 positionWS, float2 positionCS)
+        {
+            #if defined(_DITHER_ON)
+            float distanceToCamera = length(positionWS - GetCameraPositionWS());
+            float ditherStrength = saturate((distanceToCamera - _NearDistance) / (_FarDistance - _NearDistance));
+            ditherStrength = pow(ditherStrength, _DitherScale);
+            // ditherStrength = 1.0 - ditherStrength;
+
+            float2 screenUV = positionCS / _ScaledScreenParams.x;
+            // return half4(screenUV,0,1);
+            // 生成抖动值
+            // float ditherValue = random(screenUV);       //使用屏幕UV使抖动是相对静止的
+            // ditherValue = SAMPLE_TEXTURE2D(_DitherMap, sampler_DitherMap, uv*100);      // 采样抖动纹理
+            int2 pixelPos = int2(positionCS % 4);
+            float ditherValue = threshold[pixelPos.y][pixelPos.x];
+
+            float screenDis = distance(screenUV, float2(0.5, _ScaledScreenParams.y/_ScaledScreenParams.x*0.5));
+            screenDis *= 2;                     // 控制剔除的大小
+            // screenDis = Pow4(screenDis);        // 控制剔除的过渡
+            screenDis = saturate(screenDis);
+
+            clip(screenDis - ditherValue * (1 - screenDis) * (1 - ditherStrength));
+            // clip((1 + ditherValue) * lerp(ditherStrength, 1, screenDis) - 1);   // 距离和屏幕中心共同控制
+            // clip((out_data.alpha + ditherValue) * ditherStrength - 1);       // 基础的距离算法
+            #endif
+        }
+        
         // 随机函数，用于生成抖动效果
         // float random(float2 uv)
         // {
@@ -140,8 +175,6 @@
             // GPU Instancing
             #pragma multi_compile_instancing
 
-            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
-            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
             // #include "Assets/Art/Shaders/Library/KIIFPBR.hlsl"
 
             struct Attributes
@@ -166,13 +199,6 @@
                 UNITY_VERTEX_INPUT_INSTANCE_ID
                 UNITY_VERTEX_OUTPUT_STEREO
             };
-
-            static const float4x4 threshold = float4x4(
-            0.0, 0.5333, 0.1333, 0.6667,
-            0.8, 0.2667, 0.9333, 0.4,
-            0.2, 0.7333, 0.0667, 0.6,
-            1.0, 0.4667, 0.8667, 0.3333
-            );
 
             TEXTURE2D(_BaseMap);            SAMPLER(sampler_BaseMap);
             // TEXTURE2D(_DitherMap);          SAMPLER(sampler_DitherMap);
@@ -236,29 +262,7 @@
                 color *= _BaseColor;
 
                 #if defined(_ALPHATEST_ON)
-                #if defined(_DITHER_ON)
-                float distanceToCamera = length(input.positionWS - GetCameraPositionWS());
-                float ditherStrength = saturate((distanceToCamera - _NearDistance) / (_FarDistance - _NearDistance));
-                ditherStrength = pow(ditherStrength, _DitherScale);
-                // ditherStrength = 1.0 - ditherStrength;
-
-                float2 screenUV = input.positionCS.xy / _ScaledScreenParams.x;
-                // return half4(screenUV,0,1);
-                // 生成抖动值
-                // float ditherValue = random(screenUV);       //使用屏幕UV使抖动是相对静止的
-                // ditherValue = SAMPLE_TEXTURE2D(_DitherMap, sampler_DitherMap, uv*100);      // 采样抖动纹理
-                int2 pixelPos = int2(input.positionCS.xy % 4);
-                float ditherValue = threshold[pixelPos.y][pixelPos.x];
-
-                float screenDis = distance(screenUV, float2(0.5, _ScaledScreenParams.y/_ScaledScreenParams.x*0.5));
-                screenDis *= 2;                     // 控制剔除的大小
-                // screenDis = Pow4(screenDis);        // 控制剔除的过渡
-                screenDis = saturate(screenDis);
-
-                clip(screenDis - ditherValue * (1 - screenDis) * (1 - ditherStrength));
-                // clip((1 + ditherValue) * lerp(ditherStrength, 1, screenDis) - 1);   // 距离和屏幕中心共同控制
-                // clip((out_data.alpha + ditherValue) * ditherStrength - 1);       // 基础的距离算法
-                #endif
+                Dither(input.positionWS, input.positionCS.xy);
                 clip(color.a - _Cutoff);
                 #endif
 
@@ -366,6 +370,7 @@
             // -------------------------------------
             // Material Keywords
             #pragma shader_feature_local_fragment  _ALPHATEST_ON
+            #pragma shader_feature_local_fragment  _DITHER_ON
 
             //--------------------------------------
             // GPU Instancing
@@ -375,9 +380,18 @@
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/SurfaceInput.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/Shaders/DepthOnlyPass.hlsl"
 
-            Varyings DepthOnlyVertex_Tree(Attributes input)
+            struct Varyings_Tree
             {
-                Varyings output = (Varyings)0;
+                float2 uv           : TEXCOORD0;
+                float4 positionCS   : SV_POSITION;
+                float3 positionWS   : TEXCOORD1;
+                UNITY_VERTEX_INPUT_INSTANCE_ID
+                UNITY_VERTEX_OUTPUT_STEREO
+            };
+
+            Varyings_Tree DepthOnlyVertex_Tree(Attributes input)
+            {
+                Varyings_Tree output = (Varyings_Tree)0;
                 UNITY_SETUP_INSTANCE_ID(input);
                 UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(output);
 
@@ -386,13 +400,17 @@
                 float3 positionWS = TransformObjectToWorld(input.position.xyz);
                 positionWS = Wind(positionWS);
                 output.positionCS = TransformWorldToHClip(positionWS);
+                output.positionWS = positionWS;
                 // output.positionCS = TransformObjectToHClip(input.position.xyz);
                 return output;
             }
 
-            half4 ShadowPassFragment_Tree(Varyings input) : SV_TARGET
+            half4 ShadowPassFragment_Tree(Varyings_Tree input) : SV_TARGET
             {
                 Alpha(SampleAlbedoAlpha(input.uv, TEXTURE2D_ARGS(_BaseMap, sampler_BaseMap)).a, _BaseColor, _Cutoff);
+                #if defined(_ALPHATEST_ON)
+                Dither(input.positionWS, input.positionCS.xy);
+                #endif
                 return 0;
             }
             ENDHLSL
