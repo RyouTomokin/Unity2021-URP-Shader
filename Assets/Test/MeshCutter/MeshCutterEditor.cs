@@ -223,6 +223,11 @@ namespace Tomokin
                 BakeTerrainTexture();
             }
 
+            if (GUILayout.Button("平滑Mesh法线"))
+            {
+                SmoothMeshNormal();
+            }
+            
             if (GUILayout.Button("一键切割并烘焙"))
             {
                 ClearMeshSplit();
@@ -489,6 +494,26 @@ namespace Tomokin
             }
 
             isBaked = true;
+        }
+        
+        private void SmoothMeshNormal()
+        {
+            if (_submeshInfos.Count <= 0)
+            {
+                Debug.LogError("没有切割的模型数据");
+                return;
+            }
+            
+            for (int i = 0; i < _submeshInfos.Count; i++)
+            {
+                var obj = _submeshInfos[i].gameObject;
+                var mesh = _submeshInfos[i].mesh;
+                if (mesh == null) continue;
+
+                MeshNormalSmooth.SmoothNormals(mesh);
+
+                Debug.Log($"[{obj.name}] 平滑法线完成（使用工具类）");
+            }
         }
 
         static void TerrainBakeMaterialGen(SubmeshInfo sub, Material bakeMat, int size, string path, bool bakeNormal = true, bool bakeMask = true)
