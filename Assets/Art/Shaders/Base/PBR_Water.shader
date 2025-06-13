@@ -227,6 +227,7 @@
                 // -------------------------------------
                 //采样 初始化
                 float2 uv1 = lerp(input.uv.xy, input.positionWS.xz, _UseWorldPositionUV);
+                float uv2 = lerp(input.uv.x, (input.positionWS.x + input.positionWS.z) * 0.01, _UseWorldPositionUV);
                 float time = _Time.y % 1000;
                 
                 float3 normalWS = input.normalWS.xyz;
@@ -288,8 +289,8 @@
                 fresnel = Pow4(fresnel) * fresnel;
                 fresnel = fresnel * 0.99 + 0.01;            //fresnel remap[0,1]->[0.01,1]
                 
-                //水体泡沫                
-                float2 foamUV = float2((input.positionWS.x + input.positionWS.z)*0.01, 1 - edgeFade) * _FoamMap_ST.xy;
+                //水体泡沫
+                float2 foamUV = float2(uv2, 1 - edgeFade) * _FoamMap_ST.xy;
                 foamUV += time * _FoamMap_ST.zw;
                 // half sidefoamMask = lerp(_FoamBase, input.color.r, _UseSideFoamMask);   // 河流泡沫才需要河边
                 half foamMask = SAMPLE_TEXTURE2D(_FoamMap, sampler_FoamMap, foamUV).r;
