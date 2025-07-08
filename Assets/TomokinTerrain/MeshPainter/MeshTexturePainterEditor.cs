@@ -255,6 +255,8 @@ namespace Tomokin
                         EditorGUI.BeginChangeCheck();
                         painter.terrainTextures[sIndex].tilling = EditorGUILayout.FloatField("Tiling",
                             painter.terrainTextures[sIndex].tilling);
+                        painter.terrainTextures[sIndex].offset = EditorGUILayout.Vector2Field("Offset",
+                            painter.terrainTextures[sIndex].offset);
                         if (EditorGUI.EndChangeCheck())
                         {
                             painter.UpdateTiling(sIndex);

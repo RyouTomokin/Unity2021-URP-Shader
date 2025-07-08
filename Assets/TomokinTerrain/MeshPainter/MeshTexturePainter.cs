@@ -952,6 +952,19 @@ namespace Tomokin
             {
                 Debug.LogWarning($"没有参数:{paramName}");
             }
+            paramName = $"_UVOffset{index+1:D2}";
+            if (material.HasProperty(paramName))
+            {
+                Vector4 current = material.GetVector(paramName);
+                Vector2 offset = terrainTextures[index].offset;
+                current.z = offset.x;
+                current.w = offset.y;
+                material.SetVector(paramName, current);
+            }
+            else
+            {
+                Debug.LogWarning($"没有参数:{paramName}");
+            }
         }
         public void UpdateAlbedoInArray(Texture2D newTexture)
         {

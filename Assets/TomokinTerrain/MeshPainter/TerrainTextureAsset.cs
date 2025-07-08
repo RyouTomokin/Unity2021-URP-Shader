@@ -21,6 +21,7 @@ namespace Tomokin
         public Texture2D normalMap;
         public Texture2D maskMap;
         public float tilling;
+        public Vector2 offset;
 
         public TerrainTexture(Texture2D albedo = null)
         {
@@ -28,6 +29,7 @@ namespace Tomokin
             this.normalMap = null;
             this.maskMap = null;
             this.tilling = 1;
+            this.offset = Vector2.zero;
         }
     }
     

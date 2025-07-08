@@ -22,6 +22,22 @@ Shader "KIIF/Terrain"
         _UVScale14("UVScale14", Float) = 1
         _UVScale15("UVScale15", Float) = 1
         _UVScale16("UVScale16", Float) = 1
+        _UVOffset01("UVOffset01", Vector) = (1, 1, 0, 0)
+        _UVOffset02("UVOffset02", Vector) = (1, 1, 0, 0)
+        _UVOffset03("UVOffset03", Vector) = (1, 1, 0, 0)
+        _UVOffset04("UVOffset04", Vector) = (1, 1, 0, 0)
+        _UVOffset05("UVOffset05", Vector) = (1, 1, 0, 0)
+        _UVOffset06("UVOffset06", Vector) = (1, 1, 0, 0)
+        _UVOffset07("UVOffset07", Vector) = (1, 1, 0, 0)
+        _UVOffset08("UVOffset08", Vector) = (1, 1, 0, 0)
+        _UVOffset09("UVOffset09", Vector) = (1, 1, 0, 0)
+        _UVOffset10("UVOffset10", Vector) = (1, 1, 0, 0)
+        _UVOffset11("UVOffset11", Vector) = (1, 1, 0, 0)
+        _UVOffset12("UVOffset12", Vector) = (1, 1, 0, 0)
+        _UVOffset13("UVOffset13", Vector) = (1, 1, 0, 0)
+        _UVOffset14("UVOffset14", Vector) = (1, 1, 0, 0)
+        _UVOffset15("UVOffset15", Vector) = (1, 1, 0, 0)
+        _UVOffset16("UVOffset16", Vector) = (1, 1, 0, 0)
 
 //        [Toggle(_DoubleSide)] _DoubleSide("双面", Float) = 0.0
 //        [Toggle(_ALPHATEST_ON)] _AlphaTest("Alpha Clipping", Float) = 0.0
@@ -145,6 +161,22 @@ Shader "KIIF/Terrain"
             float _UVScale14;
             float _UVScale15;
             float _UVScale16;
+            float4 _UVOffset01;
+            float4 _UVOffset02;
+            float4 _UVOffset03;
+            float4 _UVOffset04;
+            float4 _UVOffset05;
+            float4 _UVOffset06;
+            float4 _UVOffset07;
+            float4 _UVOffset08;
+            float4 _UVOffset09;
+            float4 _UVOffset10;
+            float4 _UVOffset11;
+            float4 _UVOffset12;
+            float4 _UVOffset13;
+            float4 _UVOffset14;
+            float4 _UVOffset15;
+            float4 _UVOffset16;
 
             // half _Cutoff;
             half _BumpScale;
@@ -241,20 +273,44 @@ Shader "KIIF/Terrain"
                 }
             }
 
+            float4 GetUVOffset(uint layerIndex)
+            {
+                switch(layerIndex)
+                {
+                    case 0 : return _UVOffset01;
+                    case 1 : return _UVOffset02;
+                    case 2 : return _UVOffset03;
+                    case 3 : return _UVOffset04;
+                    case 4 : return _UVOffset05;
+                    case 5 : return _UVOffset06;
+                    case 6 : return _UVOffset07;
+                    case 7 : return _UVOffset08;
+                    case 8 : return _UVOffset09;
+                    case 9 : return _UVOffset10;
+                    case 10: return _UVOffset11;
+                    case 11: return _UVOffset12;
+                    case 12: return _UVOffset13;
+                    case 13: return _UVOffset14;
+                    case 14: return _UVOffset15;
+                    case 15: return _UVOffset16;
+                    default: return float4(1,1,0,0); // 默认值
+                }
+            }
+
             float GetUVScale(uint layerIndex)
             {
                 switch(layerIndex)
                 {
-                    case 0: return _UVScale01;
-                    case 1: return _UVScale02;
-                    case 2: return _UVScale03;
-                    case 3: return _UVScale04;
-                    case 4: return _UVScale05;
-                    case 5: return _UVScale06;
-                    case 6: return _UVScale07;
-                    case 7: return _UVScale08;
-                    case 8: return _UVScale09;
-                    case 9: return _UVScale10;
+                    case 0 : return _UVScale01;
+                    case 1 : return _UVScale02;
+                    case 2 : return _UVScale03;
+                    case 3 : return _UVScale04;
+                    case 4 : return _UVScale05;
+                    case 5 : return _UVScale06;
+                    case 6 : return _UVScale07;
+                    case 7 : return _UVScale08;
+                    case 8 : return _UVScale09;
+                    case 9 : return _UVScale10;
                     case 10: return _UVScale11;
                     case 11: return _UVScale12;
                     case 12: return _UVScale13;
@@ -277,6 +333,8 @@ Shader "KIIF/Terrain"
                 LayerSample result = (LayerSample)0;
 
                 uv *= GetUVScale(layerIndex);
+                float4 offset = GetUVOffset(layerIndex);
+                uv = uv * offset.xy + offset.zw;
                 // 采样颜色贴图（Texture2DArray）
                 result.albedo = SAMPLE_TEXTURE2D_ARRAY(_BaseMap, sampler_BaseMap, uv, layerIndex);
 
@@ -476,7 +534,7 @@ Shader "KIIF/Terrain"
                 mapNormal = pow(mapNormal, 2.2);
                 return half4(mapNormal, 1);
                 #endif
-                
+
                 #if defined(_BAKEMODEMASK)
                 return half4(mapSM,1);
                 #endif
