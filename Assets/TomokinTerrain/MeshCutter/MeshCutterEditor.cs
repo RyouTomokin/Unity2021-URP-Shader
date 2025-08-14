@@ -3,6 +3,7 @@ using UnityEngine;
 using UnityEditor;
 using System.Collections.Generic;
 using System.IO;
+using UnityEngine.Rendering;
 
 namespace Tomokin
 {
@@ -641,8 +642,17 @@ namespace Tomokin
 
             finalMat.SetFloat("_Smoothness", 0);
             finalMat.mainTexture = AssetDatabase.LoadAssetAtPath<Texture2D>(colorMapPath);
-            if(bakeNormal) finalMat.SetTexture("_BumpMap",AssetDatabase.LoadAssetAtPath<Texture2D>(normalMapPath));
-            if (bakeMask) finalMat.SetTexture("_SMAEMap", AssetDatabase.LoadAssetAtPath<Texture2D>(maskMapPath));
+            if (bakeNormal)
+            {
+                finalMat.SetTexture("_BumpMap",AssetDatabase.LoadAssetAtPath<Texture2D>(normalMapPath));
+                CoreUtils.SetKeyword(finalMat, "_NORMALMAP", true);
+            }
+
+            if (bakeMask)
+            {
+                finalMat.SetTexture("_SMAEMap", AssetDatabase.LoadAssetAtPath<Texture2D>(maskMapPath));
+                CoreUtils.SetKeyword(finalMat, "_SMAEMap", true);
+            }
 
             AssetDatabase.CreateAsset(finalMat, $"{path}{terrain.name}.mat");
 

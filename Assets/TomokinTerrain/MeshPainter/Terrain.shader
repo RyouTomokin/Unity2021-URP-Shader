@@ -345,7 +345,7 @@ Shader "KIIF/Terrain"
                 #endif
 
                 // #if defined(_SMAEMAP)
-                result.sm = SAMPLE_TEXTURE2D_ARRAY(_SMAEMap, sampler_SMAEMap, uv, layerIndex);
+                result.sm = SAMPLE_TEXTURE2D_ARRAY(_SMAEMap, sampler_SMAEMap, uv, layerIndex).rgb;
                 // #endif
 
                 return result;
@@ -442,13 +442,15 @@ Shader "KIIF/Terrain"
                 float blendWeight[16];
                 uint paintedLayerIndex = 0;
 
-                for(uint i = 0; i < 16; i++)
+                for(uint k = 0; k < 16; k++)
                 {
-                    blendHeight[i] = 0;
+                    blendHeight[k] = 0;
                 }
 
                 // 采样地形的颜色纹理（法线、金属粗糙）  并计算权重高度
-                for (uint layerIndex = 0; layerIndex < _LayerCount; layerIndex ++)
+                uint layerIndex = 0;
+                [unroll]
+                for (layerIndex = 0; layerIndex < _LayerCount; layerIndex ++)
                 {
                     uint controlLayer = ceil(layerIndex / 4);
                     uint index = layerIndex % 4;
@@ -462,7 +464,7 @@ Shader "KIIF/Terrain"
                         // 高度计算(重新映射高度，使得高度差更容易绘制出)
                         // half power = max(_HeightPower, 1e-5);
                         half power = 1;
-                        weight = pow(weight, max(1 - pow(layer.albedo.a, power), 0.4));
+                        weight = pow(abs(weight), max(1 - pow(layer.albedo.a, power), 0.4));
                         float tempHeight = weight * layer.albedo.a;
                         maxHeight = max(maxHeight, tempHeight);         // 高度权重的最大值
                         blendHeight[paintedLayerIndex] = tempHeight;    // 高度权重
@@ -488,7 +490,7 @@ Shader "KIIF/Terrain"
                 // half transition = max(_HeightTransition, 1e-5);
                 const half transition = 0.5;
 
-                for(uint layerIndex = 0; layerIndex < paintedLayerIndex; layerIndex++)
+                for(layerIndex = 0; layerIndex < paintedLayerIndex; layerIndex++)
                 {
                     blendHeight[layerIndex] = max(blendHeight[layerIndex] - maxHeight + transition, 0)
                         * blendWeight[layerIndex];
@@ -496,7 +498,7 @@ Shader "KIIF/Terrain"
                 }
 
                 // 混合颜色
-                for(uint layerIndex = 0; layerIndex < paintedLayerIndex; layerIndex++)
+                for(layerIndex = 0; layerIndex < paintedLayerIndex; layerIndex++)
                 {
                     // 权重归一化
                     half w = blendHeight[layerIndex] / sumHeight;
@@ -531,7 +533,7 @@ Shader "KIIF/Terrain"
 
                 #if defined(_BAKEMODENORMAL) && defined(_NORMALMAP)
                 mapNormal = mapNormal * 0.5 + 0.5;
-                mapNormal = pow(mapNormal, 2.2);
+                // mapNormal = pow(mapNormal, 2.2);
                 return half4(mapNormal, 1);
                 #endif
 
