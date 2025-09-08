@@ -3,12 +3,13 @@ Shader "KIIF/Effect/DistortionOnly"
     Properties
     {
         [HideInInspector][MainColor][HDR] _BaseColor("Color", Color) = (1,1,1,1)
-        [MainTexture] _BaseMap("Height", 2D) = "white" {}
-        _DistortStrength("DistortStrength", float) = 500
+        [MainTexture] _BaseMap("Height(Custom1.xy:Offset,custom1.z:Strength)", 2D) = "white" {}
+        _MainSpeed("主贴图流动速度", Vector) = (0,0,0,0)
+        
+        _DistortStrength("DistortStrength", float) = 1
 //        [Toggle] _SOFTPARTICLES("开启软粒子", Float) = 0.0
 //        _SoftParticle("软粒子", Range(0 , 10)) = 1
         _MoveToCamera("移向摄像机", Range(-20 , 20)) = 0
-        [HideInInspector] _ZTest("_ZTest", Float) = 1.0
     }
     SubShader
     {
@@ -22,7 +23,7 @@ Shader "KIIF/Effect/DistortionOnly"
             Name "ForwardLit"
             
             Blend SrcAlpha OneMinusSrcAlpha
-            ZTest [_ZTest]
+            ZTest LEqual
             Zwrite Off
             
             HLSLPROGRAM
@@ -35,9 +36,7 @@ Shader "KIIF/Effect/DistortionOnly"
 
             // -------------------------------------
             // Particle Keywords
-            #pragma shader_feature_local _SOFTPARTICLES_ON
-            #pragma shader_feature_local_fragment _ _ALPHAPREMULTIPLY_ON _ALPHAMODULATE_ON
-            #pragma shader_feature_local_fragment _ _COLOROVERLAY_ON _COLORCOLOR_ON _COLORADDSUBDIFF_ON
+            // #pragma shader_feature_local _SOFTPARTICLES_ON
 
             // -------------------------------------
             // Unity defined keywords
@@ -62,6 +61,7 @@ Shader "KIIF/Effect/DistortionOnly"
                 float3 normalOS                 : NORMAL;
                 half4  color                    : COLOR;
                 float2 texcoord                 : TEXCOORD0;
+                float3 texcoord1                : TEXCOORD1;
                 UNITY_VERTEX_INPUT_INSTANCE_ID
             };
 
@@ -70,9 +70,10 @@ Shader "KIIF/Effect/DistortionOnly"
                 float4 clipPos                  : SV_POSITION;
                 half4  color                    : COLOR;
                 float2 texcoord                 : TEXCOORD0;
-                float3 normalWS                 : TEXCOORD1;
-                float3 positionWS               : TEXCOORD2;
-                float4 screenPos                : TEXCOORD3;
+                float3 texcoord1                : TEXCOORD1;
+                float3 normalWS                 : TEXCOORD2;
+                float3 positionWS               : TEXCOORD3;
+                float4 screenPos                : TEXCOORD4;
 
                 #if defined(_SOFTPARTICLES_ON) || defined(_FADING_ON) || defined(_DISTORTION_ON)
                     float4 projectedPosition: TEXCOORD6;
@@ -85,6 +86,7 @@ Shader "KIIF/Effect/DistortionOnly"
             CBUFFER_START(UnityPerMaterial)
             float4 _BaseMap_ST;
             half4 _BaseColor;
+            half4 _MainSpeed;
             // half _Cutoff;
             half _DistortStrength;
             half _SoftParticle;
@@ -120,6 +122,7 @@ Shader "KIIF/Effect/DistortionOnly"
 
                 // output.texcoord = TRANSFORM_TEX(input.texcoord, _BaseMap);
                 output.texcoord = input.texcoord;
+                output.texcoord1 = input.texcoord1;
 
                 output.screenPos = vertexInput.positionNDC/output.clipPos.w;
 
@@ -137,9 +140,11 @@ Shader "KIIF/Effect/DistortionOnly"
                 UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(input);
 
                 // 初始化粒子参数
-                float2 uv = input.texcoord;
-                float2 baseUV = uv * _BaseMap_ST.xy + _BaseMap_ST.zw * _Time.y;
+                float2 uv = input.texcoord.xy;
+                float2 uvOffset = input.texcoord1.xy;
+                float2 baseUV = uv * _BaseMap_ST.xy + uvOffset + _BaseMap_ST.zw + _MainSpeed.xy * _Time.y;
                 float4 vertexColor = input.color;
+                half   distortStrength = _DistortStrength * input.texcoord1.z;
                 
                 half4 color = _BaseColor * vertexColor;
 
@@ -155,15 +160,20 @@ Shader "KIIF/Effect/DistortionOnly"
                 float3 VU = normalize(cross(V, VR));
                 VR = cross(VU, V);
                 float2 offset = float2(dot(D, VR), -dot(D, VU)) * (_ScreenParams.zw - 1);
-                offset *= (_ProjectionParams.z * input.screenPos.z) * _DistortStrength * H;
+                offset *= (_ProjectionParams.z * input.screenPos.z) * distortStrength * H;
+
+                // 屏幕边缘
+                half2 screenSide = 1 - abs(input.screenPos.xy - 0.5) * 2;
+                half sideTest = screenSide.x * screenSide.y;
                 
                 // 遮罩
                 half2 uvArea = 1 - abs(uv * 2 - 1);
                 half mask = smoothstep(0, 0.2, uvArea.x * uvArea.y);
-                offset *= mask;
+                
+                offset *= mask * sideTest;
                 
                 //用input.clipPos.xy / _ScaledScreenParams.xy代替input.screenPos.xy能得到更精确的屏幕UV
-                float2 distortUV = input.screenPos.xy + offset;
+                float2 distortUV = input.clipPos.xy / _ScaledScreenParams.xy + offset;
                 color.rgb *= SampleSceneColor(distortUV);
                 
                 // 软粒子

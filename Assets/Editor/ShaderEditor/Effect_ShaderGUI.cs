@@ -65,7 +65,7 @@ public class Effect_ShaderGUI : ShaderGUI
         
         BaseColor = FindProperty("_BaseColor", props);
         BaseMap = FindProperty("_BaseMap", props);
-        Cutoff = FindProperty("_Cutoff", props);
+        Cutoff = FindProperty("_Cutoff", props, false);
         SoftParticlesEnabled = FindProperty("_SoftParticlesEnabled", props);
         SoftParticle = FindProperty("_SoftParticle", props);
         MoveToCamera = FindProperty("_MoveToCamera", props);
@@ -122,7 +122,7 @@ public class Effect_ShaderGUI : ShaderGUI
             EditorGUI.indentLevel++;
             m_MaterialEditor.ShaderProperty(BaseColor, "颜色");
             m_MaterialEditor.ShaderProperty(BaseMap, "颜色贴图");
-            m_MaterialEditor.ShaderProperty(Cutoff, "透明度裁切");
+            if (Cutoff != null) m_MaterialEditor.ShaderProperty(Cutoff, "透明度裁切");
             m_MaterialEditor.ShaderProperty(SoftParticlesEnabled, "开启软粒子");
             if (material.GetFloat("_SoftParticlesEnabled") == 1)
             {
